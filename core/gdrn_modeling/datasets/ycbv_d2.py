@@ -62,14 +62,23 @@ class YCBV_Dataset:
         self.num_to_load = data_cfg["num_to_load"]  # -1
         self.filter_invalid = data_cfg["filter_invalid"]
 
+        self.ref_key = data_cfg.get("ref_key", "ycbv")
+        self.data_ref = ref.__dict__[self.ref_key]
+
         # default: 0000~0059 and synt
-        self.cam = np.array([[1066.778, 0.0, 312.9869], [0.0, 1067.487, 241.3109], [0.0, 0.0, 1.0]], dtype="float32")
+        self.cam = np.array(
+            data_cfg.get(
+                "cam",
+                [[1066.778, 0.0, 312.9869], [0.0, 1067.487, 241.3109], [0.0, 0.0, 1.0]],
+            ),
+            dtype="float32",
+        )
         # 0060~0091
         # cmu_cam = np.array([[1077.836, 0.0, 323.7872], [0.0, 1078.189, 279.6921], [0.0, 0.0, 1.0]], dtype='float32')
         ##################################################
 
         # NOTE: careful! Only the selected objects
-        self.cat_ids = [cat_id for cat_id, obj_name in ref.ycbv.id2obj.items() if obj_name in self.objs]
+        self.cat_ids = [cat_id for cat_id, obj_name in self.data_ref.id2obj.items() if obj_name in self.objs]
         # map selected objs to [0, num_objs-1]
         self.cat2label = {v: i for i, v in enumerate(self.cat_ids)}  # id_map
         self.label2cat = {label: cat for cat, label in self.cat2label.items()}
@@ -206,7 +215,7 @@ class YCBV_Dataset:
                     mask_full_file = osp.join(image_root, f"{scene_id:06d}/mask/{im_id:06d}_{anno_i:06d}.png")
                     assert osp.exists(mask_full_file), mask_full_file
 
-                proj = (self.cam @ trans.T).T  # NOTE: use self.cam here
+                proj = (record["cam"] @ trans.T).T
                 proj = proj[:2] / proj[2]
 
                 inst = {
@@ -311,7 +320,7 @@ class YCBV_Dataset:
         models = []
         for obj_name in self.objs:
             model = inout.load_ply(
-                osp.join(self.models_root, f"obj_{ref.ycbv.obj2id[obj_name]:06d}.ply"), vertex_scale=self.scale_to_meter
+                osp.join(self.models_root, f"obj_{self.data_ref.obj2id[obj_name]:06d}.ply"), vertex_scale=self.scale_to_meter
             )
             # NOTE: the bbox3d_and_center is not obtained from centered vertices
             # for BOP models, not a big problem since they had been centered
@@ -482,6 +491,48 @@ for obj in ref.ycbv.objects:
                 ref_key="ycbv",
             )
 
+SPLITS_YCBV["part_train"] = dict(
+    name="part_train",
+    dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/part/"),
+    models_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/part/models"),
+    objs=ref.part.objects,
+    ann_files=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/image_sets/train.txt")],
+    image_prefixes=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/train")],
+    scale_to_meter=1.0,
+    with_masks=True,
+    with_depth=False,
+    with_xyz=True,
+    height=480,
+    width=640,
+    cache_dir=osp.join(PROJ_ROOT, ".cache"),
+    use_cache=True,
+    num_to_load=-1,
+    filter_invalid=True,
+    ref_key="part",
+    id="part",
+)
+
+SPLITS_YCBV["part_test"] = dict(
+    name="part_test",
+    dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/part/"),
+    models_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/part/models"),
+    objs=ref.part.objects,
+    ann_files=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/image_sets/test.txt")],
+    image_prefixes=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/test")],
+    scale_to_meter=1.0,
+    with_masks=True,
+    with_depth=False,
+    with_xyz=False,
+    height=480,
+    width=640,
+    cache_dir=osp.join(PROJ_ROOT, ".cache"),
+    use_cache=True,
+    num_to_load=-1,
+    filter_invalid=False,
+    ref_key="part",
+    id="part",
+)
+
 
 def register_with_name_cfg(name, data_cfg=None):
     """Assume pre-defined datasets live in `./datasets`.
@@ -503,7 +554,7 @@ def register_with_name_cfg(name, data_cfg=None):
     DatasetCatalog.register(name, YCBV_Dataset(used_cfg))
     # something like eval_types
     MetadataCatalog.get(name).set(
-        id="ycbv",  # NOTE: for pvnet to determine module
+        id=used_cfg.get("id", "ycbv"),  # NOTE: for pvnet to determine module
         ref_key=used_cfg["ref_key"],
         objs=used_cfg["objs"],
         eval_error_types=["ad", "rete", "proj"],

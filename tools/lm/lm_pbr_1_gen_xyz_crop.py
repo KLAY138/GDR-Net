@@ -13,53 +13,33 @@ from tqdm import tqdm
 cur_dir = osp.abspath(osp.dirname(__file__))
 PROJ_ROOT = osp.join(cur_dir, "../..")
 sys.path.insert(0, PROJ_ROOT)
+import ref
 from lib.meshrenderer.meshrenderer_phong import Renderer
 from lib.vis_utils.image import grid_show
 from lib.pysixd import misc
 from lib.utils.mask_utils import mask2bbox_xyxy
 
 
-idx2class = {
-    1: "ape",
-    2: "benchvise",
-    3: "bowl",
-    4: "camera",
-    5: "can",
-    6: "cat",
-    7: "cup",
-    8: "driller",
-    9: "duck",
-    10: "eggbox",
-    11: "glue",
-    12: "holepuncher",
-    13: "iron",
-    14: "lamp",
-    15: "phone",
-}
-
-class2idx = {_name: _id for _id, _name in idx2class.items()}
-
-classes = idx2class.values()
-classes = sorted(classes)
-
 # DEPTH_FACTOR = 1000.
 IM_H = 480
 IM_W = 640
+vertex_scale = 0.001
 near = 0.01
 far = 6.5
 
 data_dir = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/train_pbr"))
 
-cls_indexes = sorted(idx2class.keys())
-cls_names = [idx2class[cls_idx] for cls_idx in cls_indexes]
-lm_model_dir = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/models"))
+DEFAULT_REF_KEY = "lm_full"
+data_ref = ref.__dict__[DEFAULT_REF_KEY]
+idx2class = data_ref.id2obj
+
+cls_indexes = sorted(list(idx2class.keys()))
+lm_model_dir = data_ref.model_dir
 model_paths = [osp.join(lm_model_dir, f"obj_{obj_id:06d}.ply") for obj_id in cls_indexes]
 texture_paths = None
 
-scenes = [i for i in range(0, 49 + 1)]
 xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/train_pbr/xyz_crop"))
-
-K = np.array([[572.4114, 0, 325.2611], [0, 573.57043, 242.04899], [0, 0, 1]])
+scenes = [i for i in range(0, 49 + 1)]
 
 
 def normalize_to_01(img):
@@ -98,7 +78,7 @@ class XyzGen(object):
     def get_renderer(self):
         if self.renderer is None:
             self.renderer = Renderer(
-                model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache"), vertex_scale=0.001
+                model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache"), vertex_scale=vertex_scale
             )
         return self.renderer
 
@@ -114,7 +94,7 @@ class XyzGen(object):
 
             gt_dict = mmcv.load(osp.join(scene_root, "scene_gt.json"))
             # gt_info_dict = mmcv.load(osp.join(scene_root, "scene_gt_info.json"))
-            # cam_dict = mmcv.load(osp.join(scene_root, "scene_camera.json"))
+            cam_dict = mmcv.load(osp.join(scene_root, "scene_camera.json"))
 
             for str_im_id in tqdm(gt_dict, postfix=f"{scene_id}"):
                 int_im_id = int(str_im_id)
@@ -127,6 +107,7 @@ class XyzGen(object):
                     R = np.array(anno["cam_R_m2c"], dtype="float32").reshape(3, 3)
                     t = np.array(anno["cam_t_m2c"], dtype="float32") / 1000.0
                     # pose = np.hstack([R, t.reshape(3, 1)])
+                    K = np.array(cam_dict[str_im_id]["cam_K"], dtype=np.float32).reshape(3, 3)
 
                     save_path = osp.join(
                         xyz_root,
@@ -212,20 +193,49 @@ if __name__ == "__main__":
 
     import setproctitle
 
-    parser = argparse.ArgumentParser(description="gen lm train_pbr xyz")
+    parser = argparse.ArgumentParser(description="gen xyz_crop for BOP-style datasets")
+    parser.add_argument("--ref-key", type=str, default=DEFAULT_REF_KEY)
+    parser.add_argument("--data-dir", type=str, default=data_dir)
+    parser.add_argument("--xyz-root", type=str, default="")
+    parser.add_argument("--im-w", type=int, default=IM_W)
+    parser.add_argument("--im-h", type=int, default=IM_H)
+    parser.add_argument("--near", type=float, default=near)
+    parser.add_argument("--far", type=float, default=far)
+    parser.add_argument("--vertex-scale", type=float, default=None)
     parser.add_argument("--split", type=str, default="train", help="split")
     parser.add_argument("--scene", type=str, default="all", help="scene id")
     parser.add_argument("--vis", default=False, action="store_true", help="vis")
     parser.add_argument("--no-save", default=False, action="store_true", help="do not save results")
     args = parser.parse_args()
 
-    height = IM_H
-    width = IM_W
+    data_ref = ref.__dict__[args.ref_key]
+    idx2class = data_ref.id2obj
+    cls_indexes = sorted(list(idx2class.keys()))
+    lm_model_dir = data_ref.model_dir
+    model_paths = [osp.join(lm_model_dir, f"obj_{obj_id:06d}.ply") for obj_id in cls_indexes]
+
+    data_dir = osp.normpath(args.data_dir)
+    xyz_root = osp.normpath(args.xyz_root) if args.xyz_root else osp.join(data_dir, "xyz_crop")
+    IM_W = int(args.im_w)
+    IM_H = int(args.im_h)
+    near = float(args.near)
+    far = float(args.far)
+    vertex_scale = float(args.vertex_scale) if args.vertex_scale is not None else float(data_ref.vertex_scale)
+
+    if args.scene == "all":
+        scene_ids = []
+        for name in os.listdir(data_dir):
+            p = osp.join(data_dir, name)
+            if osp.isdir(p) and name.isdigit():
+                scene_ids.append(int(name))
+        scenes = sorted(scene_ids)
+    else:
+        scenes = [int(args.scene)]
 
     VIS = args.vis
 
     T_begin = time.perf_counter()
-    setproctitle.setproctitle(f"gen_xyz_lm_train_pbr_{args.split}_{args.scene}")
+    setproctitle.setproctitle(f"gen_xyz_{args.ref_key}_{args.split}_{args.scene}")
     xyz_gen = XyzGen(args.split, args.scene)
     xyz_gen.main()
     T_end = time.perf_counter() - T_begin
