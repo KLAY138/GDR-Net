@@ -8,7 +8,7 @@ import scipy.stats as sci_stats
 def se3_inverse(RT):
     R = RT[0:3, 0:3]
     T = RT[0:3, 3].reshape((3, 1))
-    RT_new = np.zeros((3, 4), dtype=np.float32)
+    RT_new = np.zeros((3, 4), dtype=np.float64)
     RT_new[0:3, 0:3] = R.transpose()
     RT_new[0:3, 3] = -1 * np.dot(R.transpose(), T).reshape(3)
     return RT_new
@@ -21,7 +21,7 @@ def se3_mul(RT1, RT2):
     R2 = RT2[0:3, 0:3]
     T2 = RT2[0:3, 3].reshape((3, 1))
 
-    RT_new = np.zeros((3, 4), dtype=np.float32)
+    RT_new = np.zeros((3, 4), dtype=np.float64)
     RT_new[0:3, 0:3] = np.dot(R1, R2)
     T_new = np.dot(R1, T2) + T1
     RT_new[0:3, 3] = T_new.reshape(3)
@@ -34,7 +34,7 @@ def T_inv_transform(T_src, T_tgt):
     :param T_tgt:
     :return: T_delta: delta in pixel
     """
-    T_delta = np.zeros((3,), dtype=np.float32)
+    T_delta = np.zeros((3,), dtype=np.float64)
 
     T_delta[0] = T_tgt[0] / T_tgt[2] - T_src[0] / T_src[2]
     T_delta[1] = T_tgt[1] / T_tgt[2] - T_src[1] / T_src[2]
@@ -45,7 +45,7 @@ def T_inv_transform(T_src, T_tgt):
 
 def rotation_x(theta):
     t = theta * np.pi / 180.0
-    R = np.zeros((3, 3), dtype=np.float32)
+    R = np.zeros((3, 3), dtype=np.float64)
     R[0, 0] = 1
     R[1, 1] = np.cos(t)
     R[1, 2] = -(np.sin(t))
@@ -56,7 +56,7 @@ def rotation_x(theta):
 
 def rotation_y(theta):
     t = theta * np.pi / 180.0
-    R = np.zeros((3, 3), dtype=np.float32)
+    R = np.zeros((3, 3), dtype=np.float64)
     R[0, 0] = np.cos(t)
     R[0, 2] = np.sin(t)
     R[1, 1] = 1
@@ -67,7 +67,7 @@ def rotation_y(theta):
 
 def rotation_z(theta):
     t = theta * np.pi / 180.0
-    R = np.zeros((3, 3), dtype=np.float32)
+    R = np.zeros((3, 3), dtype=np.float64)
     R[0, 0] = np.cos(t)
     R[0, 1] = -(np.sin(t))
     R[1, 0] = np.sin(t)

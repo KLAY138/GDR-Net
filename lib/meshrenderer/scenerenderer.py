@@ -121,9 +121,9 @@ class SceneRenderer(object):
 
         rand_voc = cv2.imread(self._voc_imgs[np.random.randint(len(self._voc_imgs))])
         rand_voc = cv2.resize(rand_voc, (self._width, self._height))
-        rand_voc = rand_voc.astype(np.float32) / 255.0
+        rand_voc = rand_voc.astype(np.float64) / 255.0
         # print bgr.max()
-        bgr = bgr.astype(np.float32) / 255.0
+        bgr = bgr.astype(np.float64) / 255.0
 
         depth_three_chan = np.dstack((depth,) * 3)
         bgr = rand_voc * (depth_three_chan == 0.0).astype(np.uint8) + bgr * (depth_three_chan > 0).astype(np.uint8)

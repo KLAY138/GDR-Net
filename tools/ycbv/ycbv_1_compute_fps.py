@@ -74,7 +74,7 @@ def _load_ply_xyz_binary_little_endian(path: str) -> "np.ndarray":
         }
         dtype = np.dtype([(name, type_map[typ]) for name, typ in props])
         data = np.fromfile(f, dtype=dtype, count=vcount)
-    xyz = np.stack([data["x"], data["y"], data["z"]], axis=1).astype(np.float32)
+    xyz = np.stack([data["x"], data["y"], data["z"]], axis=1).astype(np.float64)
     return xyz
 
 
@@ -104,14 +104,14 @@ def _farthest_point_sampling_np(pts: "np.ndarray", num_fps: int, init_center: bo
         d2 = np.sum((pts - p) ** 2, axis=1)
         min_d2 = np.minimum(min_d2, d2)
 
-    return np.stack(selected[1:], axis=0).astype(np.float32)
+    return np.stack(selected[1:], axis=0).astype(np.float64)
 
 
 def _get_fps_and_center_fallback(pts: "np.ndarray", num_fps: int, init_center: bool) -> "np.ndarray":
     import numpy as np
 
     fps_pts = _farthest_point_sampling_np(pts, num_fps=num_fps, init_center=init_center)
-    center = pts.mean(axis=0, keepdims=True).astype(np.float32)
+    center = pts.mean(axis=0, keepdims=True).astype(np.float64)
     return np.concatenate([fps_pts, center], axis=0)
 
 
@@ -146,9 +146,9 @@ def main():
         model_path = osp.join(model_dir, f"obj_{obj_id:06d}.ply")
         if inout is not None:
             model = inout.load_ply(model_path, vertex_scale=vertex_scale)
-            pts = model["pts"].astype(np.float32)
+            pts = model["pts"].astype(np.float64)
         else:
-            pts = _load_ply_xyz_binary_little_endian(model_path).astype(np.float32) * float(vertex_scale)
+            pts = _load_ply_xyz_binary_little_endian(model_path).astype(np.float64) * float(vertex_scale)
         fps_dict[str(obj_id)] = {}
         get_fps = _get_fps_and_center_fallback
         fps_dict[str(obj_id)]["fps4_and_center"] = get_fps(pts, num_fps=4, init_center=True)

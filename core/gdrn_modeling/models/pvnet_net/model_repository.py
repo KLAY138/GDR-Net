@@ -321,6 +321,6 @@ if __name__ == "__main__":
         hi, wi = np.random.randint(0, 29), np.random.randint(0, 49)
         h, w = 256 + hi * 8, 256 + wi * 8
         print(h, w)
-        img = np.random.uniform(-1, 1, [1, 3, h, w]).astype(np.float32)
+        img = np.random.uniform(-1, 1, [1, 3, h, w]).astype(np.float64)
         net = Resnet50_8s(2, 2).cuda()
         out = net(torch.tensor(img).cuda())

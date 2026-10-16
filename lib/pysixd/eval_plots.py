@@ -629,7 +629,7 @@ def plot_vsd_err_hist(
             min_vsd_errs[view] = np.min(top_n_errors)
 
         min_vsd_errs_sorted = np.sort(min_vsd_errs)
-        recall = np.float32(np.arange(total_views) + 1.0) / total_views
+        recall = np.float64(np.arange(total_views) + 1.0) / total_views
 
         # fill curve
         min_vsd_errs_sorted = np.hstack((min_vsd_errs_sorted, np.array([1.0])))

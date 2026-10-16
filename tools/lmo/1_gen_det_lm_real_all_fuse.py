@@ -92,7 +92,7 @@ def main():
             mask_path = osp.join(
                 sixd_train_path, "{:06d}".format(rand_obj_id + 1), "mask", "{:06d}_{:06d}.png".format(rand_view_id, 0)
             )
-            orig_mask = mmcv.imread(mask_path, "unchanged").astype(np.float32)
+            orig_mask = mmcv.imread(mask_path, "unchanged").astype(np.float64)
             mask = cv2.warpAffine(orig_mask, M, (orig_mask.shape[1], orig_mask.shape[0]))
             mask = mask > 0
             rand_img[mask == False] = 0  # here == can not be replaced by is
@@ -168,7 +168,7 @@ def main():
             img_vis = vis_image_bboxes_cv2(new_train_img, bboxes, labels=labels)
 
             cv2.imshow("new_train_img", img_vis)
-            cv2.imshow("new_train_mask", new_train_mask.astype(np.float32))
+            cv2.imshow("new_train_mask", new_train_mask.astype(np.float64))
             if cv2.waitKey(0) == 27:
                 cv2.destroyAllWindows()
                 exit(0)  # esc to quit

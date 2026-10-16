@@ -63,7 +63,7 @@ class Renderer(object):
             vertices.append(np.hstack((vertex, normal, color / 255.0)).flatten())
 
         indices = np.hstack(indices).astype(np.uint32)
-        vertices = np.hstack(vertices).astype(np.float32)
+        vertices = np.hstack(vertices).astype(np.float64)
 
         vao = gu.VAO(
             {

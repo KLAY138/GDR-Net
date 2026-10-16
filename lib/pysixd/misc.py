@@ -34,9 +34,9 @@ def pnp(points_3d, points_2d, camera_matrix, method=cv2.SOLVEPNP_ITERATIVE):
         points_3d = np.expand_dims(points_3d, 0)
         points_2d = np.expand_dims(points_2d, 0)
 
-    points_2d = np.ascontiguousarray(points_2d.astype(np.float64))
-    points_3d = np.ascontiguousarray(points_3d.astype(np.float64))
-    camera_matrix = camera_matrix.astype(np.float64)
+    points_2d = np.ascontiguousarray(points_2d.astype(np.float6464))
+    points_3d = np.ascontiguousarray(points_3d.astype(np.float6464))
+    camera_matrix = camera_matrix.astype(np.float6464)
     _, R_exp, t = cv2.solvePnP(points_3d, points_2d, camera_matrix, dist_coeffs, flags=method)
     # , None, None, False, cv2.SOLVEPNP_UPNP)
 
@@ -161,9 +161,9 @@ def pnp_v2(
         points_3d = np.expand_dims(points_3d, 0)
         points_2d = np.expand_dims(points_2d, 0)
 
-    points_2d = np.ascontiguousarray(points_2d.astype(np.float64))
-    points_3d = np.ascontiguousarray(points_3d.astype(np.float64))
-    camera_matrix = camera_matrix.astype(np.float64)
+    points_2d = np.ascontiguousarray(points_2d.astype(np.float6464))
+    points_3d = np.ascontiguousarray(points_3d.astype(np.float6464))
+    camera_matrix = camera_matrix.astype(np.float6464)
     if not ransac:
         _, R_exp, t = cv2.solvePnP(points_3d, points_2d, camera_matrix, dist_coeffs, flags=method)
     else:
@@ -294,7 +294,7 @@ def calc_emb_bp_fast(depth, R, T, K):
     Kinv = np.linalg.inv(K)
 
     height, width = depth.shape
-    # ProjEmb = np.zeros((height, width, 3)).astype(np.float32)
+    # ProjEmb = np.zeros((height, width, 3)).astype(np.float64)
 
     grid_x, grid_y = np.meshgrid(np.arange(width), np.arange(height))
     grid_2d = np.stack([grid_x, grid_y, np.ones((height, width))], axis=2)
@@ -359,7 +359,7 @@ def backproject_v2(depth, K):
     Kinv = np.linalg.inv(K)
 
     height, width = depth.shape
-    # pc_cam = np.zeros((height, width, 3)).astype(np.float32)
+    # pc_cam = np.zeros((height, width, 3)).astype(np.float64)
 
     grid_x, grid_y = np.meshgrid(np.arange(width), np.arange(height))
     grid_2d = np.stack([grid_x, grid_y, np.ones((height, width))], axis=2)
@@ -406,8 +406,8 @@ def calc_emb(model_points_, R, T, K, height=480, width=640):
     # numerical error due to round
     points_2d, z = points_to_2D(model_points_, R, T, K)
     image_points = np.round(points_2d).astype(np.int32)
-    ProjEmb = np.zeros((height, width, 3)).astype(np.float32)
-    depth = np.zeros((height, width, 1)).astype(np.float32)
+    ProjEmb = np.zeros((height, width, 3)).astype(np.float64)
+    depth = np.zeros((height, width, 1)).astype(np.float64)
     for i, (x, y) in enumerate(image_points):
         if x >= width or y >= height or x < 0 or y < 0:
             continue
@@ -461,9 +461,9 @@ def calc_emb_proj(vertices, R, T, K, attributes=None, width=640, height=480):
     image_points = np.round(points_2d).astype(np.int32)
 
     n_c = attributes.shape[1]
-    ProjEmb = np.zeros((height, width, n_c)).astype(np.float32)
+    ProjEmb = np.zeros((height, width, n_c)).astype(np.float64)
 
-    depth = np.zeros((height, width, 1)).astype(np.float32)
+    depth = np.zeros((height, width, 1)).astype(np.float64)
     for i, (x, y) in enumerate(image_points):
         if x >= width or y >= height or x < 0 or y < 0:
             continue
@@ -528,8 +528,8 @@ def project_pts(pts, K, R, t):
 @jit
 def get_obj_im_c(K, t):
     # t: cam_t_m2c
-    K = K.astype(np.float32)
-    t = t.astype(np.float32)
+    K = K.astype(np.float64)
+    t = t.astype(np.float64)
     obj_c = K.dot(t)
     c_x = obj_c[0] / obj_c[2]
     c_y = obj_c[1] / obj_c[2]
@@ -562,8 +562,8 @@ class Precomputer(object):
 
         if depth_im.shape != Precomputer.depth_im_shape or not np.all(K == Precomputer.K):
             Precomputer.K = K
-            Precomputer.pre_Xs = (Precomputer.xs - K[0, 2]) / np.float64(K[0, 0])
-            Precomputer.pre_Ys = (Precomputer.ys - K[1, 2]) / np.float64(K[1, 1])
+            Precomputer.pre_Xs = (Precomputer.xs - K[0, 2]) / np.float6464(K[0, 0])
+            Precomputer.pre_Ys = (Precomputer.ys - K[1, 2]) / np.float6464(K[1, 1])
 
         return Precomputer.pre_Xs, Precomputer.pre_Ys
 
@@ -584,7 +584,7 @@ def depth_im_to_dist_im_fast(depth_im, K):
     pre_Xs, pre_Ys = Precomputer.precompute_lazy(depth_im, K)
 
     dist_im = np.sqrt(
-        np.multiply(pre_Xs, depth_im) ** 2 + np.multiply(pre_Ys, depth_im) ** 2 + depth_im.astype(np.float64) ** 2
+        np.multiply(pre_Xs, depth_im) ** 2 + np.multiply(pre_Ys, depth_im) ** 2 + depth_im.astype(np.float6464) ** 2
     )
 
     return dist_im
@@ -607,7 +607,7 @@ def depth_im_to_dist_im(depth_im, K):
     Xs = np.multiply(xs - K[0, 2], depth_im) * (1.0 / K[0, 0])
     Ys = np.multiply(ys - K[1, 2], depth_im) * (1.0 / K[1, 1])
 
-    dist_im = np.sqrt(Xs.astype(np.float64) ** 2 + Ys.astype(np.float64) ** 2 + depth_im.astype(np.float64) ** 2)
+    dist_im = np.sqrt(Xs.astype(np.float6464) ** 2 + Ys.astype(np.float6464) ** 2 + depth_im.astype(np.float6464) ** 2)
     # dist_im = np.linalg.norm(np.dstack((Xs, Ys, depth_im)), axis=2)  # Slower.
 
     return dist_im
@@ -615,7 +615,7 @@ def depth_im_to_dist_im(depth_im, K):
 
 def norm_depth(depth, valid_start=0.2, valid_end=1.0):
     mask = depth > 0
-    depth_n = depth.astype(np.float)
+    depth_n = depth.astype(np.float64)
     depth_n[mask] -= depth_n[mask].min()
     depth_n[mask] /= depth_n[mask].max() / (valid_end - valid_start)
     depth_n[mask] += valid_start
@@ -706,13 +706,13 @@ def calc_pose_2d_bbox_xyxy_v2(points, width, height, K, R_m2c, t_m2c):
 
 @jit
 def compute_2d_bbox_xyxy_from_pose(points, pose, K, width=640, height=480, clip=False):
-    x3d = np.ones((4, points.shape[0]), dtype=np.float32)
+    x3d = np.ones((4, points.shape[0]), dtype=np.float64)
     x3d[0, :] = points[:, 0]
     x3d[1, :] = points[:, 1]
     x3d[2, :] = points[:, 2]
 
-    RT = pose.astype(np.float32)  # numba should operate on the same dtype
-    K = K.astype(np.float32)
+    RT = pose.astype(np.float64)  # numba should operate on the same dtype
+    K = K.astype(np.float64)
     # _K = K.copy()
     # _K[0, 2] -= 0.5
     # _K[1, 2] -= 0.5
@@ -735,13 +735,13 @@ def compute_2d_bbox_xyxy_from_pose(points, pose, K, width=640, height=480, clip=
 @jit
 def compute_2d_bbox_xyxy_from_pose_v2(points, pose, K, width=640, height=480, clip=False):
     """br excluded."""
-    x3d = np.ones((4, points.shape[0]), dtype=np.float32)
+    x3d = np.ones((4, points.shape[0]), dtype=np.float64)
     x3d[0, :] = points[:, 0]
     x3d[1, :] = points[:, 1]
     x3d[2, :] = points[:, 2]
 
-    RT = pose.astype(np.float32)
-    K = K.astype(np.float32)
+    RT = pose.astype(np.float64)
+    K = K.astype(np.float64)
     # _K = K.copy()
     # _K[0, 2] -= 0.5
     # _K[1, 2] -= 0.5
@@ -843,9 +843,9 @@ def paste_emb_to_im(src, bbox_xyxy, height=480, width=640):
     """
     if src.ndim == 3:
         channel = src.shape[-1]
-        tgt = np.zeros((height, width, channel), dtype=np.float32)
+        tgt = np.zeros((height, width, channel), dtype=np.float64)
     else:
-        tgt = np.zeros((height, width), dtype=np.float32)
+        tgt = np.zeros((height, width), dtype=np.float64)
     x1, y1, x2, y2 = bbox_xyxy[:4]
     if src.ndim == 3:
         tgt[y1 : y2 + 1, x1 : x2 + 1, :] = src
@@ -866,10 +866,10 @@ def paste_emb_to_im_batch(embs, bboxes_xyxy, height=480, width=640):
             if embs[i].ndim == 3:
                 channel = embs[i].shape[-1]
                 tgt_embs = [
-                    np.zeros((height, width, channel), dtype=np.float32) if emb is not None else None for emb in embs
+                    np.zeros((height, width, channel), dtype=np.float64) if emb is not None else None for emb in embs
                 ]
             else:
-                tgt_embs = [np.zeros((height, width), dtype=np.float32) if emb is not None else None for emb in embs]
+                tgt_embs = [np.zeros((height, width), dtype=np.float64) if emb is not None else None for emb in embs]
             break
 
     for i in range(num):
@@ -1002,7 +1002,7 @@ def get_bbox3d_and_center(pts):
     # bb.append([maxx, miny, maxz])
     # bb.append([maxx, maxy, maxz])
     # bb.append([avgx, avgy, avgz])
-    # bb = np.asarray(bb, dtype=np.float32)
+    # bb = np.asarray(bb, dtype=np.float64)
     # NOTE: we use a different order from roi10d
     """
             1 -------- 0
@@ -1025,7 +1025,7 @@ def get_bbox3d_and_center(pts):
             [maxx, miny, minz],
             [avgx, avgy, avgz],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     return bb
 
@@ -1070,7 +1070,7 @@ def get_axis3d_and_center(pts, scale=0.5):
             [maxx, miny, minz],
             [avgx, avgy, avgz],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     # front, right, up, center
     kpts = np.array(
@@ -1080,7 +1080,7 @@ def get_axis3d_and_center(pts, scale=0.5):
             (bb[0] + bb[1] + bb[2] + bb[3]) / 4,
             bb[-1],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     kpts = (kpts - bb[-1][None]) * scale + bb[-1][None]
     return kpts
@@ -1298,8 +1298,8 @@ def ply_vtx_color_expand(model):
 
         ptsExpand.append(1 / 3.0 * (pts[int(face[0])] + pts[int(face[1])] + pts[int(face[2])]))
         colorsExpand.append(1 / 3.0 * (colors[int(face[0])] + colors[int(face[1])] + colors[int(face[2])]))
-    ptsExpand = np.array(ptsExpand, dtype=np.float)
-    colorsExpand = np.array(colorsExpand, dtype=np.float)
+    ptsExpand = np.array(ptsExpand, dtype=np.float64)
+    colorsExpand = np.array(colorsExpand, dtype=np.float64)
     pts_expand = np.concatenate((pts, ptsExpand), axis=0)
     colors_expand = np.concatenate((colors, colorsExpand), axis=0)
     model["pts_expand"] = pts_expand
@@ -1325,8 +1325,8 @@ def calc_uv_emb_proj(uv_model_path_or_model, R, T, K, height=480, width=640, exp
     points_2d, z = points_to_2D(points, R, T, K)
     image_points = np.round(points_2d).astype(np.int32)
     # image_points = (points_2d + 0.5).astype(np.int32)
-    uv_ProjEmb = np.zeros((height, width, 2)).astype(np.float32)
-    depth = np.zeros((height, width, 1)).astype(np.float32)
+    uv_ProjEmb = np.zeros((height, width, 2)).astype(np.float64)
+    depth = np.zeros((height, width, 1)).astype(np.float64)
     for i, (x, y) in enumerate(image_points):
         if x >= width or y >= height or x < 0 or y < 0:
             continue
@@ -1356,8 +1356,8 @@ def calc_texture_uv_emb_proj(uv_model_path_or_model, R, T, K, height=480, width=
     points_2d, z = points_to_2D(points, R, T, K)
     image_points = np.round(points_2d).astype(np.int32)
     # image_points = (points_2d + 0.5).astype(np.int32)
-    uv_ProjEmb = np.zeros((height, width, 2)).astype(np.float32)
-    depth = np.zeros((height, width, 1)).astype(np.float32)
+    uv_ProjEmb = np.zeros((height, width, 2)).astype(np.float64)
+    depth = np.zeros((height, width, 1)).astype(np.float64)
     for i, (x, y) in enumerate(image_points):
         if x >= width or y >= height or x < 0 or y < 0:
             continue

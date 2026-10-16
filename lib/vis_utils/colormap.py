@@ -88,7 +88,7 @@ _COLORS = np.array(
         0.857, 0.857, 0.857,
         1.000, 1.000, 1.000
     ]
-).astype(np.float32).reshape(-1, 3)
+).astype(np.float64).reshape(-1, 3)
 # fmt: on
 
 

@@ -79,7 +79,7 @@ def heatmap(input, min=None, max=None, to_255=False, to_rgb=False, colormap=cv2.
     if to_255:
         return final.astype(np.uint8)
     else:
-        return final.astype(np.float32) / 255.0
+        return final.astype(np.float64) / 255.0
 
 
 def vis_bbox_opencv(img, bbox, thick=1, fmt="xywh", bbox_color="green"):

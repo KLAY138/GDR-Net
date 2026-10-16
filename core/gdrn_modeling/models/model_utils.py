@@ -11,8 +11,8 @@ def get_2d_coord(bs, width, height, dtype=torch.float32, device="cuda"):
         height:
     """
     # coords values are in [-1, 1]
-    x = np.linspace(-1, 1, width, dtype=np.float32)
-    y = np.linspace(-1, 1, height, dtype=np.float32)
+    x = np.linspace(-1, 1, width, dtype=np.float64)
+    y = np.linspace(-1, 1, height, dtype=np.float64)
     xy = np.meshgrid(x, y)
     coord = np.stack([xy for _ in range(bs)])
     coord_tensor = torch.tensor(coord, dtype=dtype, device=device)
@@ -49,8 +49,8 @@ def compute_mean_re_te(pred_transes, pred_rots, gt_transes, gt_rots):
     gt_rots = gt_rots.detach().cpu().numpy()
 
     bs = pred_rots.shape[0]
-    R_errs = np.zeros((bs,), dtype=np.float32)
-    T_errs = np.zeros((bs,), dtype=np.float32)
+    R_errs = np.zeros((bs,), dtype=np.float64)
+    T_errs = np.zeros((bs,), dtype=np.float64)
     for i in range(bs):
         R_errs[i] = re(pred_rots[i], gt_rots[i])
         T_errs[i] = te(pred_transes[i], gt_transes[i])

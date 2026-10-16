@@ -353,7 +353,7 @@ def test_flat_and_anneal():
     # import pdb;pdb.set_trace()
     epoch_lrs.append([total_epochs, scheduler.get_lr()[0]])
 
-    epoch_lrs = np.asarray(epoch_lrs, dtype=np.float32)
+    epoch_lrs = np.asarray(epoch_lrs, dtype=np.float64)
     for i in range(len(epoch_lrs)):
         print("{:02d} {}".format(int(epoch_lrs[i][0]), epoch_lrs[i][1]))
 

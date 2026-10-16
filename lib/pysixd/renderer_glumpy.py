@@ -238,11 +238,11 @@ def draw_color(
         program["u_texture"] = texture
     else:
         program["u_use_texture"] = int(False)
-        program["u_texture"] = np.zeros((1, 1, 4), np.float32)
+        program["u_texture"] = np.zeros((1, 1, 4), np.float64)
 
     # Frame buffer object
-    color_buf = np.zeros((shape[0], shape[1], 4), np.float32).view(gloo.TextureFloat2D)
-    depth_buf = np.zeros((shape[0], shape[1]), np.float32).view(gloo.DepthTexture)
+    color_buf = np.zeros((shape[0], shape[1], 4), np.float64).view(gloo.TextureFloat2D)
+    depth_buf = np.zeros((shape[0], shape[1]), np.float64).view(gloo.DepthTexture)
     fbo = gloo.FrameBuffer(color=color_buf, depth=depth_buf)
     fbo.activate()
 
@@ -270,7 +270,7 @@ def draw_color(
     program.draw(gl.GL_TRIANGLES, index_buffer)
 
     # Retrieve the contents of the FBO texture
-    rgb = np.zeros((shape[0], shape[1], 4), dtype=np.float32)
+    rgb = np.zeros((shape[0], shape[1], 4), dtype=np.float64)
     gl.glReadPixels(0, 0, shape[1], shape[0], gl.GL_RGBA, gl.GL_FLOAT, rgb)
     rgb.shape = shape[0], shape[1], 4
     rgb = rgb[::-1, :]
@@ -289,8 +289,8 @@ def draw_depth(shape, vertex_buffer, index_buffer, mat_model, mat_view, mat_proj
     program["u_mvp"] = _compute_model_view_proj(mat_model, mat_view, mat_proj)
 
     # Frame buffer object
-    color_buf = np.zeros((shape[0], shape[1], 4), np.float32).view(gloo.TextureFloat2D)
-    depth_buf = np.zeros((shape[0], shape[1]), np.float32).view(gloo.DepthTexture)
+    color_buf = np.zeros((shape[0], shape[1], 4), np.float64).view(gloo.TextureFloat2D)
+    depth_buf = np.zeros((shape[0], shape[1]), np.float64).view(gloo.DepthTexture)
     fbo = gloo.FrameBuffer(color=color_buf, depth=depth_buf)
     fbo.activate()
 
@@ -310,7 +310,7 @@ def draw_depth(shape, vertex_buffer, index_buffer, mat_model, mat_view, mat_proj
     program.draw(gl.GL_TRIANGLES, index_buffer)
 
     # Retrieve the contents of the FBO texture
-    depth = np.zeros((shape[0], shape[1], 4), dtype=np.float32)
+    depth = np.zeros((shape[0], shape[1], 4), dtype=np.float64)
     gl.glReadPixels(0, 0, shape[1], shape[0], gl.GL_RGBA, gl.GL_FLOAT, depth)
     depth.shape = shape[0], shape[1], 4
     depth = depth[::-1, :]
@@ -346,12 +346,12 @@ def render(
     # Set texture / color of vertices
     if texture is not None:
         if texture.max() > 1.0:
-            texture = texture.astype(np.float32) / 255.0
+            texture = texture.astype(np.float64) / 255.0
         texture = np.flipud(texture)
         texture_uv = model["texture_uv"]
-        colors = np.zeros((model["pts"].shape[0], 3), np.float32)
+        colors = np.zeros((model["pts"].shape[0], 3), np.float64)
     else:
-        texture_uv = np.zeros((model["pts"].shape[0], 2), np.float32)
+        texture_uv = np.zeros((model["pts"].shape[0], 2), np.float64)
         if not surf_color:
             if "colors" in model.keys():
                 assert model["pts"].shape[0] == model["colors"].shape[0]
@@ -359,28 +359,28 @@ def render(
                 if colors.max() > 1.0:
                     colors /= 255.0  # Color values are expected in range [0, 1]
             else:
-                colors = np.ones((model["pts"].shape[0], 3), np.float32) * 0.5
+                colors = np.ones((model["pts"].shape[0], 3), np.float64) * 0.5
         else:
             colors = np.tile(list(surf_color) + [1.0], [model["pts"].shape[0], 1])
 
     # Set the vertex data
     if mode == "depth":
-        vertices_type = [("a_position", np.float32, 3), ("a_color", np.float32, colors.shape[1])]
+        vertices_type = [("a_position", np.float64, 3), ("a_color", np.float64, colors.shape[1])]
         vertices = np.array(list(zip(model["pts"], colors)), vertices_type)
     else:
         if shading == "flat":
             vertices_type = [
-                ("a_position", np.float32, 3),
-                ("a_color", np.float32, colors.shape[1]),
-                ("a_texcoord", np.float32, 2),
+                ("a_position", np.float64, 3),
+                ("a_color", np.float64, colors.shape[1]),
+                ("a_texcoord", np.float64, 2),
             ]
             vertices = np.array(list(zip(model["pts"], colors, texture_uv)), vertices_type)
         else:  # shading == 'phong'
             vertices_type = [
-                ("a_position", np.float32, 3),
-                ("a_normal", np.float32, 3),
-                ("a_color", np.float32, colors.shape[1]),
-                ("a_texcoord", np.float32, 2),
+                ("a_position", np.float64, 3),
+                ("a_normal", np.float64, 3),
+                ("a_color", np.float64, colors.shape[1]),
+                ("a_texcoord", np.float64, 2),
             ]
             vertices = np.array(list(zip(model["pts"], model["normals"], colors, texture_uv)), vertices_type)
 
@@ -390,13 +390,13 @@ def render(
     render_depth = mode in ["depth", "rgb+depth"]
 
     # Model matrix
-    mat_model = np.eye(4, dtype=np.float32)  # From object space to world space
+    mat_model = np.eye(4, dtype=np.float64)  # From object space to world space
 
     # View matrix (transforming also the coordinate system from OpenCV to
     # OpenGL camera space)
-    mat_view = np.eye(4, dtype=np.float32)  # From world space to eye space
+    mat_view = np.eye(4, dtype=np.float64)  # From world space to eye space
     mat_view[:3, :3], mat_view[:3, 3] = R, t.squeeze()
-    yz_flip = np.eye(4, dtype=np.float32)
+    yz_flip = np.eye(4, dtype=np.float64)
     yz_flip[1, 1], yz_flip[2, 2] = -1, -1
     mat_view = yz_flip.dot(mat_view)  # OpenCV to OpenGL camera system
     mat_view = mat_view.T  # OpenGL expects column-wise matrix format

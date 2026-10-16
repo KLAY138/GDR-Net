@@ -107,7 +107,7 @@ class XyzGen(object):
                     R = np.array(anno["cam_R_m2c"], dtype="float32").reshape(3, 3)
                     t = np.array(anno["cam_t_m2c"], dtype="float32") / 1000.0
                     # pose = np.hstack([R, t.reshape(3, 1)])
-                    K = np.array(cam_dict[str_im_id]["cam_K"], dtype=np.float32).reshape(3, 3)
+                    K = np.array(cam_dict[str_im_id]["cam_K"], dtype=np.float64).reshape(3, 3)
 
                     save_path = osp.join(
                         xyz_root,
@@ -126,7 +126,7 @@ class XyzGen(object):
                         )
                         print(f"{save_path}")
                         xyz_info = {
-                            "xyz_crop": np.zeros((IM_H, IM_W, 3), dtype=np.float16),
+                            "xyz_crop": np.zeros((IM_H, IM_W, 3), dtype=np.float6416),
                             "xyxy": [0, 0, IM_W - 1, IM_H - 1],
                         }
                         if VIS:

@@ -5,10 +5,10 @@ import numpy as np
 
 class Material(object):
     def __init__(self, ambient, diffuse, specular, shininess):
-        self.__ambient = np.array(ambient, dtype=np.float32)
-        self.__diffuse = np.array(diffuse, dtype=np.float32)
-        self.__specular = np.array(specular, dtype=np.float32)
-        self.__shininess = np.array([shininess], dtype=np.float32)
+        self.__ambient = np.array(ambient, dtype=np.float64)
+        self.__diffuse = np.array(diffuse, dtype=np.float64)
+        self.__specular = np.array(specular, dtype=np.float64)
+        self.__shininess = np.array([shininess], dtype=np.float64)
 
     def getAmbient(self):
         return self.__ambient

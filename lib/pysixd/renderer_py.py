@@ -273,8 +273,8 @@ class RendererPython(renderer.Renderer):
         self.depth_programs = {}
 
         # The frame buffer object.
-        rgb_buf = np.zeros((self.height, self.width, 4), np.float32).view(gloo.TextureFloat2D)
-        depth_buf = np.zeros((self.height, self.width), np.float32).view(gloo.DepthTexture)
+        rgb_buf = np.zeros((self.height, self.width, 4), np.float64).view(gloo.TextureFloat2D)
+        depth_buf = np.zeros((self.height, self.width), np.float64).view(gloo.DepthTexture)
         self.fbo = gloo.FrameBuffer(color=rgb_buf, depth=depth_buf)
 
         # Activate the created frame buffer object.
@@ -316,7 +316,7 @@ class RendererPython(renderer.Renderer):
             colors = np.tile(list(surf_color) + [1.0], [model["pts"].shape[0], 1])
 
             # Set UV texture coordinates to dummy values.
-            texture_uv = np.zeros((model["pts"].shape[0], 2), np.float32)
+            texture_uv = np.zeros((model["pts"].shape[0], 2), np.float64)
 
         # Use the model texture.
         elif "texture_file" in self.models[obj_id].keys():
@@ -325,7 +325,7 @@ class RendererPython(renderer.Renderer):
 
             # Normalize the texture image.
             if model_texture.max() > 1.0:
-                model_texture = model_texture.astype(np.float32) / 255.0
+                model_texture = model_texture.astype(np.float64) / 255.0
             model_texture = np.flipud(model_texture)
             self.model_textures[obj_id] = model_texture
 
@@ -333,7 +333,7 @@ class RendererPython(renderer.Renderer):
             texture_uv = model["texture_uv"]
 
             # Set the per-vertex color to dummy values.
-            colors = np.zeros((model["pts"].shape[0], 3), np.float32)
+            colors = np.zeros((model["pts"].shape[0], 3), np.float64)
 
         # Use the original model color.
         elif "colors" in model.keys():
@@ -343,33 +343,33 @@ class RendererPython(renderer.Renderer):
                 colors /= 255.0  # Color values are expected in range [0, 1].
 
             # Set UV texture coordinates to dummy values.
-            texture_uv = np.zeros((model["pts"].shape[0], 2), np.float32)
+            texture_uv = np.zeros((model["pts"].shape[0], 2), np.float64)
 
         # Set the model color to gray.
         else:
-            colors = np.ones((model["pts"].shape[0], 3), np.float32) * 0.5
+            colors = np.ones((model["pts"].shape[0], 3), np.float64) * 0.5
 
             # Set UV texture coordinates to dummy values.
-            texture_uv = np.zeros((model["pts"].shape[0], 2), np.float32)
+            texture_uv = np.zeros((model["pts"].shape[0], 2), np.float64)
 
         # Set the vertex data.
         if self.mode == "depth":
-            vertices_type = [("a_position", np.float32, 3), ("a_color", np.float32, colors.shape[1])]
+            vertices_type = [("a_position", np.float64, 3), ("a_color", np.float64, colors.shape[1])]
             vertices = np.array(list(zip(model["pts"], colors)), vertices_type)
         else:
             if self.shading == "flat":
                 vertices_type = [
-                    ("a_position", np.float32, 3),
-                    ("a_color", np.float32, colors.shape[1]),
-                    ("a_texcoord", np.float32, 2),
+                    ("a_position", np.float64, 3),
+                    ("a_color", np.float64, colors.shape[1]),
+                    ("a_texcoord", np.float64, 2),
                 ]
                 vertices = np.array(list(zip(model["pts"], colors, texture_uv)), vertices_type)
             elif self.shading == "phong":
                 vertices_type = [
-                    ("a_position", np.float32, 3),
-                    ("a_normal", np.float32, 3),
-                    ("a_color", np.float32, colors.shape[1]),
-                    ("a_texcoord", np.float32, 2),
+                    ("a_position", np.float64, 3),
+                    ("a_normal", np.float64, 3),
+                    ("a_color", np.float64, colors.shape[1]),
+                    ("a_texcoord", np.float64, 2),
                 ]
                 vertices = np.array(list(zip(model["pts"], model["normals"], colors, texture_uv)), vertices_type)
             else:
@@ -395,7 +395,7 @@ class RendererPython(renderer.Renderer):
             rgb_program["u_texture"] = self.model_textures[obj_id]
         else:
             rgb_program["u_use_texture"] = int(False)
-            rgb_program["u_texture"] = np.zeros((1, 1, 4), np.float32)
+            rgb_program["u_texture"] = np.zeros((1, 1, 4), np.float64)
         self.rgb_programs[obj_id] = rgb_program
 
         # Prepare the depth OpenGL program.
@@ -423,13 +423,13 @@ class RendererPython(renderer.Renderer):
         curr_obj_id = obj_id
 
         # Model matrix (from object space to world space).
-        mat_model = np.eye(4, dtype=np.float32)
+        mat_model = np.eye(4, dtype=np.float64)
 
         # View matrix (from world space to eye space; transforms also the coordinate
         # system from OpenCV to OpenGL camera space).
-        mat_view_cv = np.eye(4, dtype=np.float32)
+        mat_view_cv = np.eye(4, dtype=np.float64)
         mat_view_cv[:3, :3], mat_view_cv[:3, 3] = R, t.squeeze()
-        yz_flip = np.eye(4, dtype=np.float32)
+        yz_flip = np.eye(4, dtype=np.float64)
         yz_flip[1, 1], yz_flip[2, 2] = -1, -1
         mat_view = yz_flip.dot(mat_view_cv)  # OpenCV to OpenGL camera system.
         mat_view = mat_view.T  # OpenGL expects column-wise matrix format.
@@ -499,7 +499,7 @@ class RendererPython(renderer.Renderer):
         program.draw(gl.GL_TRIANGLES, self.index_buffers[obj_id])
 
         # Get the content of the FBO texture.
-        rgb = np.zeros((self.height, self.width, 4), dtype=np.float32)
+        rgb = np.zeros((self.height, self.width, 4), dtype=np.float64)
         gl.glReadPixels(0, 0, self.width, self.height, gl.GL_RGBA, gl.GL_FLOAT, rgb)
         rgb.shape = (self.height, self.width, 4)
         rgb = rgb[::-1, :]
@@ -535,7 +535,7 @@ class RendererPython(renderer.Renderer):
         program.draw(gl.GL_TRIANGLES, self.index_buffers[obj_id])
 
         # Get the content of the FBO texture.
-        depth = np.zeros((self.height, self.width, 4), dtype=np.float32)
+        depth = np.zeros((self.height, self.width, 4), dtype=np.float64)
         gl.glReadPixels(0, 0, self.width, self.height, gl.GL_RGBA, gl.GL_FLOAT, depth)
         depth.shape = (self.height, self.width, 4)
         depth = depth[::-1, :]

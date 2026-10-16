@@ -152,7 +152,7 @@ def load_scenes(scene_id, eval_args, depth=False):
     cam_p = inout.load_cam_params(p["cam_params_path"])
     noof_imgs = noof_scene_views(scene_id, eval_args)
     if depth:
-        imgs = np.empty((noof_imgs,) + p["test_im_size"][::-1], dtype=np.float32)
+        imgs = np.empty((noof_imgs,) + p["test_im_size"][::-1], dtype=np.float64)
         for view_id in range(noof_imgs):
             depth_path = p["test_depth_mpath"].format(scene_id, view_id)
             try:

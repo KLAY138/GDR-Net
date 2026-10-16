@@ -7,7 +7,7 @@ def farthest_point_sampling(pts, sn, init_center=False):
     pn, _ = pts.shape
     assert pts.shape[1] == 3
 
-    pts = np.ascontiguousarray(pts, np.float32)
+    pts = np.ascontiguousarray(pts, np.float64)
     idxs = np.ascontiguousarray(np.zeros([sn], np.int32))
 
     pts_ptr = ffi.cast("float*", pts.ctypes.data)

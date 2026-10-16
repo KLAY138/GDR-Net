@@ -83,7 +83,7 @@ def depth_for_vis(depth, valid_start=0.2, valid_end=1.0):
     :return: Transformed depth image.
     """
     mask = depth > 0
-    depth_n = depth.astype(np.float)
+    depth_n = depth.astype(np.float64)
     depth_n[mask] -= depth_n[mask].min()
     depth_n[mask] /= depth_n[mask].max() / (valid_end - valid_start)
     depth_n[mask] += valid_start
@@ -143,7 +143,7 @@ def vis_object_poses(
             im_size = (depth.shape[1], depth.shape[0])
 
     if vis_depth_diff or (vis_rgb and vis_rgb_resolve_visib):
-        ren_depth = np.zeros((im_size[1], im_size[0]), np.float32)
+        ren_depth = np.zeros((im_size[1], im_size[0]), np.float64)
 
     # Render the pose estimates one by one.
     for pose in poses:
@@ -171,7 +171,7 @@ def vis_object_poses(
             if vis_rgb_resolve_visib:
                 ren_rgb[m_mask] = m_rgb[m_mask].astype(ren_rgb.dtype)
             else:
-                ren_rgb_f = ren_rgb.astype(np.float32) + m_rgb.astype(np.float32)
+                ren_rgb_f = ren_rgb.astype(np.float64) + m_rgb.astype(np.float64)
                 ren_rgb_f[ren_rgb_f > 255] = 255
                 ren_rgb = ren_rgb_f.astype(np.uint8)
 
@@ -200,7 +200,7 @@ def vis_object_poses(
         misc.ensure_dir(os.path.dirname(vis_rgb_path))
 
         vis_im_rgb = (
-            0.5 * rgb.astype(np.float32) + 0.5 * ren_rgb.astype(np.float32) + 1.0 * ren_rgb_info.astype(np.float32)
+            0.5 * rgb.astype(np.float64) + 0.5 * ren_rgb.astype(np.float64) + 1.0 * ren_rgb_info.astype(np.float64)
         )
         vis_im_rgb[vis_im_rgb > 255] = 255
         inout.save_im(vis_rgb_path, vis_im_rgb.astype(np.uint8), jpg_quality=95)
@@ -211,7 +211,7 @@ def vis_object_poses(
 
         # Calculate the depth difference at pixels where both depth maps are valid.
         valid_mask = (depth > 0) * (ren_depth > 0)
-        depth_diff = valid_mask * (ren_depth.astype(np.float32) - depth)
+        depth_diff = valid_mask * (ren_depth.astype(np.float64) - depth)
 
         delta = 15
         below_delta = valid_mask * (depth_diff < delta)

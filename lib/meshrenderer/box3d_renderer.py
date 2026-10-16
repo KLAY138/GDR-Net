@@ -59,7 +59,7 @@ class Renderer(object):
         # VAO
         vert_norms = gu.geo.load_meshes(models_cad_files, vertex_tmp_store_folder, recalculate_normals=True)
 
-        vertices = np.empty(0, dtype=np.float32)
+        vertices = np.empty(0, dtype=np.float64)
         self.min_vert = {}
         self.max_vert = {}
         for obj_id, vert_norm in enumerate(vert_norms):

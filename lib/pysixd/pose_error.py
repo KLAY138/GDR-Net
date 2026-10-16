@@ -598,7 +598,7 @@ def load_object_points(point_path):
 
 def load_object_extents(extent_path, num_classes):
     assert os.path.exists(extent_path), "Path does not exist: {}".format(extent_path)
-    extents = np.zeros((num_classes, 3), dtype=np.float32)
+    extents = np.zeros((num_classes, 3), dtype=np.float64)
     extents[1:, :] = np.loadtxt(extent_path)  # assume class 0 is '__background__'
     return extents
 

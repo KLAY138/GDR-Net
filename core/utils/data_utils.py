@@ -93,7 +93,7 @@ def crop_resize_by_warp_affine(img, center, scale, output_size, rot=0, interpola
     return dst_img
 
 
-def get_affine_transform(center, scale, rot, output_size, shift=np.array([0, 0], dtype=np.float32), inv=False):
+def get_affine_transform(center, scale, rot, output_size, shift=np.array([0, 0], dtype=np.float64), inv=False):
     """
     adapted from CenterNet: https://github.com/xingyizhou/CenterNet/blob/master/src/lib/utils/image.py
     center: ndarray: (cx, cy)
@@ -102,10 +102,10 @@ def get_affine_transform(center, scale, rot, output_size, shift=np.array([0, 0],
     output_size: int or (w, h)
     """
     if isinstance(center, (tuple, list)):
-        center = np.array(center, dtype=np.float32)
+        center = np.array(center, dtype=np.float64)
 
     if isinstance(scale, (int, float)):
-        scale = np.array([scale, scale], dtype=np.float32)
+        scale = np.array([scale, scale], dtype=np.float64)
 
     if isinstance(output_size, (int, float)):
         output_size = (output_size, output_size)
@@ -117,35 +117,35 @@ def get_affine_transform(center, scale, rot, output_size, shift=np.array([0, 0],
 
     rot_rad = np.pi * rot / 180
     src_dir = get_dir([0, src_w * -0.5], rot_rad)
-    dst_dir = np.array([0, dst_w * -0.5], np.float32)
+    dst_dir = np.array([0, dst_w * -0.5], np.float64)
 
-    src = np.zeros((3, 2), dtype=np.float32)
-    dst = np.zeros((3, 2), dtype=np.float32)
+    src = np.zeros((3, 2), dtype=np.float64)
+    dst = np.zeros((3, 2), dtype=np.float64)
     src[0, :] = center + scale_tmp * shift
     src[1, :] = center + src_dir + scale_tmp * shift
     dst[0, :] = [dst_w * 0.5, dst_h * 0.5]
-    dst[1, :] = np.array([dst_w * 0.5, dst_h * 0.5], np.float32) + dst_dir
+    dst[1, :] = np.array([dst_w * 0.5, dst_h * 0.5], np.float64) + dst_dir
 
     src[2:, :] = get_3rd_point(src[0, :], src[1, :])
     dst[2:, :] = get_3rd_point(dst[0, :], dst[1, :])
 
     if inv:
-        trans = cv2.getAffineTransform(np.float32(dst), np.float32(src))
+        trans = cv2.getAffineTransform(dst.astype(np.float32), src.astype(np.float32))
     else:
-        trans = cv2.getAffineTransform(np.float32(src), np.float32(dst))
+        trans = cv2.getAffineTransform(src.astype(np.float32), dst.astype(np.float32))
 
     return trans
 
 
 def affine_transform(pt, t):
-    new_pt = np.array([pt[0], pt[1], 1.0], dtype=np.float32).T
+    new_pt = np.array([pt[0], pt[1], 1.0], dtype=np.float64).T
     new_pt = np.dot(t, new_pt)
     return new_pt[:2]
 
 
 def get_3rd_point(a, b):
     direct = a - b
-    return b + np.array([-direct[1], direct[0]], dtype=np.float32)
+    return b + np.array([-direct[1], direct[0]], dtype=np.float64)
 
 
 def get_dir(src_point, rot_rad):
@@ -228,8 +228,8 @@ def get_2d_coord_np(width, height, low=0, high=1, fmt="CHW"):
         xy: (2, height, width)
     """
     # coords values are in [low, high]  [0,1] or [-1,1]
-    x = np.linspace(low, high, width, dtype=np.float32)
-    y = np.linspace(low, high, height, dtype=np.float32)
+    x = np.linspace(low, high, width, dtype=np.float64)
+    y = np.linspace(low, high, height, dtype=np.float64)
     xy = np.asarray(np.meshgrid(x, y))
     if fmt == "HWC":
         xy = xy.transpose(1, 2, 0)

@@ -289,8 +289,8 @@ def egocentric_to_allocentric(ego_pose, src_type="mat", dst_type="mat", cam_ray=
 # For testing whether a number is close to zero
 _EPS4 = np.finfo(float).eps * 4.0
 
-_MAX_FLOAT = np.maximum_sctype(np.float)
-_FLOAT_EPS = np.finfo(np.float).eps
+_MAX_FLOAT = np.maximum_sctype(float)
+_FLOAT_EPS = np.finfo(float).eps
 
 
 def my_mat2quat(mat, dtype=None):
@@ -427,10 +427,10 @@ def ego_pose_to_allo_pose_v2(ego_pose, rot_type="mat"):
 
 
 def test_ego_allo():
-    ego_pose = np.zeros((3, 4), dtype=np.float32)
+    ego_pose = np.zeros((3, 4), dtype=np.float64)
     ego_pose[:3, :3] = axangle2mat((1, 2, 3), 1)
     ego_pose[:3, 3] = np.array([0.4, 0.5, 0.6])
-    ego_pose_q = np.zeros((7,), dtype=np.float32)
+    ego_pose_q = np.zeros((7,), dtype=np.float64)
     ego_pose_q[:4] = mat2quat(ego_pose[:3, :3])
     ego_pose_q[4:7] = ego_pose[:3, 3]
     ego_poses = {"mat": ego_pose, "quat": ego_pose_q}
@@ -448,10 +448,10 @@ def test_ego_allo():
 
 
 def test_ego_to_allo_v2():
-    ego_pose = np.zeros((3, 4), dtype=np.float32)
+    ego_pose = np.zeros((3, 4), dtype=np.float64)
     ego_pose[:3, :3] = axangle2mat((1, 2, 3), 1)
     ego_pose[:3, 3] = np.array([0.4, 0.5, 0.6])
-    ego_pose_q = np.zeros((7,), dtype=np.float32)
+    ego_pose_q = np.zeros((7,), dtype=np.float64)
     ego_pose_q[:4] = mat2quat(ego_pose[:3, :3])
     ego_pose_q[4:7] = ego_pose[:3, 3]
     ego_poses = {"mat": ego_pose, "quat": ego_pose_q}

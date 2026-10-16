@@ -6,13 +6,13 @@ import numpy as np
 
 class Camera(object):
     def __init__(self):
-        self.__T_world_view = np.eye(4, dtype=np.float32)
-        self.__T_view_world = np.eye(4, dtype=np.float32)
+        self.__T_world_view = np.eye(4, dtype=np.float64)
+        self.__T_view_world = np.eye(4, dtype=np.float64)
 
-        self.__T_view_proj = np.eye(4, dtype=np.float32)
-        self.__T_proj_view = np.eye(4, dtype=np.float32)
+        self.__T_view_proj = np.eye(4, dtype=np.float64)
+        self.__T_proj_view = np.eye(4, dtype=np.float64)
 
-        self.__T_proj_world = np.eye(4, dtype=np.float32)
+        self.__T_proj_world = np.eye(4, dtype=np.float64)
 
         self.__viewport = (0.0, 0.0, 1.0, 1.0)
         self.__relative_viewport = True
@@ -22,9 +22,9 @@ class Camera(object):
         self.dirty = False
 
     def lookAt(self, pos, target, up):
-        pos = np.array(pos, dtype=np.float32)
-        target = np.array(target, dtype=np.float32)
-        up = np.array(up, dtype=np.float32)
+        pos = np.array(pos, dtype=np.float64)
+        target = np.array(target, dtype=np.float64)
+        up = np.array(up, dtype=np.float64)
         z = pos - target
         z *= 1.0 / np.linalg.norm(z)
         x = np.cross(up, z)
@@ -42,8 +42,8 @@ class Camera(object):
         x = radius * np.sin(phi) * np.cos(theta)
         y = radius * np.sin(phi) * np.sin(theta)
         z = radius * np.cos(phi)
-        pos = np.array((x, y, z), dtype=np.float32)
-        target = np.array((0, 0, 0), dtype=np.float32)
+        pos = np.array((x, y, z), dtype=np.float64)
+        target = np.array((0, 0, 0), dtype=np.float64)
         _z = pos - target
         _z *= 1.0 / np.linalg.norm(_z)
         up = (0, 0, 1)
@@ -68,7 +68,7 @@ class Camera(object):
         A = np.tan(fov / 2.0)
         self.__T_proj_view[:] = np.array(
             [[A / aspect, 0, 0, 0], [0, A, 0, 0], [0, 0, (far + near) / diff, 2 * far * near / diff], [0, 0, -1, 0]],
-            dtype=np.float32,
+            dtype=np.float64,
         )
         self.__T_view_proj[:] = np.linalg.inv(self.__T_proj_view)
         self.__T_proj_world[:] = np.dot(self.__T_proj_view, self.__T_view_world)
@@ -88,7 +88,7 @@ class Camera(object):
         self.setIntrinsic(K, W, H, near, far, scale, originIsInTopLeft)
         self.__T_world_view[:3, :3] = R.transpose()
         self.__T_world_view[:3, 3] = -np.dot(R.transpose(), t.squeeze())
-        z_flip = np.eye(4, dtype=np.float32)
+        z_flip = np.eye(4, dtype=np.float64)
         z_flip[2, 2] = -1
         self.__T_world_view[:] = self.__T_world_view.dot(z_flip)
         self.__T_view_world[:] = np.linalg.pinv(self.__T_world_view)
@@ -103,7 +103,7 @@ class Camera(object):
 
         Kinv = np.linalg.pinv(K)
 
-        p = np.array([r, c, 1], dtype=np.float64)
+        p = np.array([r, c, 1], dtype=np.float6464)
         d = np.dot(Kinv, p)
 
         eps = 1e-7
@@ -113,12 +113,12 @@ class Camera(object):
 
         Rx_alpha = np.array(
             [[1, 0, 0, 0], [0, np.cos(alpha), -np.sin(alpha), 0], [0, np.sin(alpha), np.cos(alpha), 0], [0, 0, 0, 1]],
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
         Ry_beta = np.array(
             [[np.cos(beta), 0, np.sin(beta), 0], [0, 1, 0, 0], [-np.sin(beta), 0, np.cos(beta), 0], [0, 0, 0, 1]],
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
         self.__T_view_world[:3, :3] = R
@@ -127,7 +127,7 @@ class Camera(object):
         self.__T_world_view[:3, :3] = R.transpose()
         self.__T_world_view[:3, 3] = -np.dot(R.transpose(), t.squeeze())
 
-        z_flip = np.eye(4, dtype=np.float32)
+        z_flip = np.eye(4, dtype=np.float64)
         z_flip[2, 2] = -1
         z_flip[1, 1] = -1
 
@@ -160,7 +160,7 @@ class Camera(object):
                 [0, 0, A, B],
                 [0, 0, -1, 0],
             ],
-            dtype=np.float64,
+            dtype=np.float6464,
         )
         ortho = (
             Camera.__glOrtho__(0, W, H, 0, near, far)
@@ -168,7 +168,7 @@ class Camera(object):
             else Camera.__glOrtho__(-W / 2.0, W / 2.0, -H / 2.0, H / 2.0, near, far)
         )
 
-        self.__T_proj_view[:] = np.dot(ortho, persp).astype(np.float32)
+        self.__T_proj_view[:] = np.dot(ortho, persp).astype(np.float64)
         self.__T_view_proj[:] = np.linalg.inv(self.__T_proj_view)
         self.__T_proj_world[:] = np.dot(self.__T_proj_view, self.__T_view_world)
         self.dirty = True
@@ -212,14 +212,14 @@ class Camera(object):
                 [0.0, 0.0, -2.0 / (farVal - nearVal), tz],
                 [0.0, 0.0, 0.0, 1.0],
             ],
-            dtype=np.float64,
+            dtype=np.float6464,
         )
 
     @property
     def data(self):
         return np.hstack(
             (self.T_view_world.T.reshape(-1), self.T_proj_view.T.reshape(-1), self.T_world_view[:3, 3].reshape(-1))
-        ).astype(np.float32)
+        ).astype(np.float64)
 
     def set_window_dimensions(self, w, h):
         self._w = w

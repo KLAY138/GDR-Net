@@ -27,7 +27,7 @@ def pose_from_predictions_test(pred_rots, pred_transes, eps=1e-4, is_allo=True):
     # use numpy since it is more accurate
     if pred_rots.shape[-1] == 4 and pred_rots.ndim == 2:
         pred_quats = pred_rots.detach().cpu().numpy()  # allo
-        ego_rot_preds = np.zeros((pred_quats.shape[0], 3, 3), dtype=np.float32)
+        ego_rot_preds = np.zeros((pred_quats.shape[0], 3, 3), dtype=np.float64)
         for i in range(pred_quats.shape[0]):
             # try:
             if is_allo:

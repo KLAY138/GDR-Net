@@ -32,11 +32,11 @@ def load_meshes_sixd(obj_files, vertex_tmp_store_folder, recalculate_normals=Fal
         attributes = []
         for model_path in tqdm(obj_files):
             model = inout.load_ply(model_path)
-            vertices = np.array(model["pts"]).astype(np.float32)
+            vertices = np.array(model["pts"]).astype(np.float64)
             if recalculate_normals:
                 normals = calc_normals(vertices)
             else:
-                normals = np.array(model["normals"]).astype(np.float32)
+                normals = np.array(model["normals"]).astype(np.float64)
             faces = np.array(model["faces"]).astype(np.uint32)
             if "colors" in model:
                 colors = np.array(model["colors"]).astype(np.uint32)
@@ -94,9 +94,9 @@ def calc_normals(vertices):
 def sphere(x_segments, y_segments):
 
     N = (x_segments + 1) * (y_segments + 1)
-    positions = np.empty((N, 3), dtype=np.float32)
-    uv = np.empty((N, 2), dtype=np.float32)
-    normals = np.empty((N, 3), dtype=np.float32)
+    positions = np.empty((N, 3), dtype=np.float64)
+    uv = np.empty((N, 2), dtype=np.float64)
+    normals = np.empty((N, 3), dtype=np.float64)
 
     i = 0
     for y in range(y_segments + 1):
@@ -169,7 +169,7 @@ def cube():
             [-1.0, 1.0, -1.0],
             [-1.0, 1.0, 1.0],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
 
     normals = np.array(
@@ -211,7 +211,7 @@ def cube():
             [0.0, 1.0, 0.0],
             [0.0, 1.0, 0.0],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
 
     uv = np.array(
@@ -253,7 +253,7 @@ def cube():
             [0.0, 1.0],
             [0.0, 0.0],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     return positions, uv, normals
 
@@ -298,7 +298,7 @@ def cube2(min, max):
             [-1.0, 1.0, -1.0],
             [-1.0, 1.0, 1.0],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
 
     normals = np.array(
@@ -340,7 +340,7 @@ def cube2(min, max):
             [0.0, 1.0, 0.0],
             [0.0, 1.0, 0.0],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
 
     uv = np.array(
@@ -382,17 +382,17 @@ def cube2(min, max):
             [min, max],
             [min, min],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     return positions, uv, normals
 
 
 def quad(reverse_uv=False):
-    positions = np.array([[-1.0, 1.0, 0.0], [-1.0, -1.0, 0.0], [1.0, 1.0, 0.0], [1.0, -1.0, 0.0]], dtype=np.float32)
+    positions = np.array([[-1.0, 1.0, 0.0], [-1.0, -1.0, 0.0], [1.0, 1.0, 0.0], [1.0, -1.0, 0.0]], dtype=np.float64)
     if reverse_uv:
-        uv = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], dtype=np.float32)
+        uv = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], dtype=np.float64)
     else:
-        uv = np.array([[0.0, 1.0], [0.0, 0.0], [1.0, 1.0], [1.0, 0.0]], dtype=np.float32)
+        uv = np.array([[0.0, 1.0], [0.0, 0.0], [1.0, 1.0], [1.0, 0.0]], dtype=np.float64)
     return positions, uv
 
 
@@ -579,15 +579,15 @@ cube_vertices_texture = np.array(
         0.0,
         1.0,
     ],
-    dtype=np.float32,
+    dtype=np.float64,
 )
 
 
 def quad_bitangent():
-    verts = np.array([[-1.0, 1.0, 0.0], [-1.0, -1.0, 0.0], [1.0, -1.0, 0.0], [1.0, 1.0, 0.0]], dtype=np.float32)
-    uv = np.array([[0.0, 1.0], [0.0, 0.0], [1.0, 0.0], [1.0, 1.0]], dtype=np.float32)
+    verts = np.array([[-1.0, 1.0, 0.0], [-1.0, -1.0, 0.0], [1.0, -1.0, 0.0], [1.0, 1.0, 0.0]], dtype=np.float64)
+    uv = np.array([[0.0, 1.0], [0.0, 0.0], [1.0, 0.0], [1.0, 1.0]], dtype=np.float64)
 
-    normal = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+    normal = np.array([0.0, 0.0, 1.0], dtype=np.float64)
 
     edge1 = verts[1] - verts[0]
     edge2 = verts[2] - verts[0]
@@ -602,7 +602,7 @@ def quad_bitangent():
             deltaUV2[1] * edge1[1] - deltaUV1[1] * edge2[1],
             deltaUV2[1] * edge1[2] - deltaUV1[1] * edge2[2],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     tangent1 /= np.linalg.norm(tangent1)
 
@@ -612,7 +612,7 @@ def quad_bitangent():
             -deltaUV2[0] * edge1[1] + deltaUV1[0] * edge2[1],
             -deltaUV2[0] * edge1[2] + deltaUV1[0] * edge2[2],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     bitangent1 /= np.linalg.norm(bitangent1)
 
@@ -629,7 +629,7 @@ def quad_bitangent():
             deltaUV2[1] * edge1[1] - deltaUV1[1] * edge2[1],
             deltaUV2[1] * edge1[2] - deltaUV1[1] * edge2[2],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     tangent2 /= np.linalg.norm(tangent2)
 
@@ -639,7 +639,7 @@ def quad_bitangent():
             -deltaUV2[0] * edge1[1] + deltaUV1[0] * edge2[1],
             -deltaUV2[0] * edge1[2] + deltaUV1[0] * edge2[2],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     bitangent2 /= np.linalg.norm(bitangent2)
 
@@ -730,7 +730,7 @@ def quad_bitangent():
             bitangent2[1],
             bitangent2[2],
         ],
-        dtype=np.float32,
+        dtype=np.float64,
     )
 
 
@@ -793,5 +793,5 @@ quad_vert_tex_normal_tangent_bitangent = np.array(
         1,
         0,
     ],
-    dtype=np.float32,
+    dtype=np.float64,
 )

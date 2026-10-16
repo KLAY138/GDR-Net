@@ -273,9 +273,9 @@ class GDRN_EvaluatorCustom(DatasetEvaluator):
                 num_points = len(img_points)
                 if num_points >= 4:
                     dist_coeffs = np.zeros(shape=[8, 1], dtype="float64")
-                    points_2d = np.ascontiguousarray(img_points.astype(np.float64))
-                    points_3d = np.ascontiguousarray(model_points.astype(np.float64))
-                    camera_matrix = K.astype(np.float64)
+                    points_2d = np.ascontiguousarray(img_points.astype(np.float6464))
+                    points_3d = np.ascontiguousarray(model_points.astype(np.float6464))
+                    camera_matrix = K.astype(np.float6464)
 
                     rvec0, _ = cv2.Rodrigues(rot_est_net)
 
@@ -411,7 +411,7 @@ class GDRN_EvaluatorCustom(DatasetEvaluator):
                         )
                     else:
                         self._logger.warning("num points: {}".format(len(img_points)))
-                        pose_est = -100 * np.ones((3, 4), dtype=np.float32)
+                        pose_est = -100 * np.ones((3, 4), dtype=np.float64)
 
                 if "trans" in cfg.MODEL.CDPN.TASK.lower():
                     # compute T from trans head

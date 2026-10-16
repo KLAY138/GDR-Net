@@ -61,7 +61,7 @@ class ColorAugSSDTransform(Transform):
         return img
 
     def convert(self, img, alpha=1, beta=0):
-        img = img.astype(np.float32) * alpha + beta
+        img = img.astype(np.float64) * alpha + beta
         img = np.clip(img, 0, 255)
         return img.astype(np.uint8)
 
