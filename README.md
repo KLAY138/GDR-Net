@@ -1,3 +1,21 @@
+# GDR-Net 不确定性分支与自定义零件姿态估计
+
+基于 [官方 GDR-Net](https://github.com/THU-DA-6D-Pose-Group/GDR-Net) 的开发扩展，保留原项目提交历史、许可证和论文引用。
+
+本分支整理了已有开发快照，主要包含：
+
+- **不确定性建模**：从坐标特征预测单通道不确定性，支持异方差形式的 L1 坐标损失，以及向 Patch-PnP 拼接不确定性特征。
+- **自定义零件数据**：BOP 格式转换、单位缩放、模型对称性元数据处理，以及图像、XYZ 和掩码的变换对齐。
+- **训练与诊断**：checkpoint 包装兼容、TensorBoard 图像输出、训练轮次计算和零件实验配置。
+
+实现入口：[GDRN 模型](core/gdrn_modeling/models/GDRN.py) · [默认开关](configs/_base_/gdrn_base.py) · [零件配置](configs/gdrn/part/a6_cPnP_part.py) · [整理与验证说明](docs/IMPORT_NOTES.md)
+
+**当前状态**：已有开发代码的整理版本。已完成修改文件的 Python 3 语法检查（一个上游遗留 Python 2 文件除外）和局部数值接口检查；本次没有运行完整训练或评测，也不据此宣称精度提升。数据、权重和本地日志未随本次提交上传。已知限制见整理说明。
+
+新增提交按功能组织，日期为本次整理日期，不代表原始开发时间。以下保留上游项目说明。
+
+---
+
 # GDR-Net
 This repo provides the PyTorch implementation of the work:
 
