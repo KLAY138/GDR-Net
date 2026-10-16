@@ -1,6 +1,7 @@
 import logging
 import os
 import os.path as osp
+import glob
 import torch
 
 import mmcv
@@ -113,9 +114,12 @@ class GDRN_Lite(LightningLite):
         if backup and self.is_global_zero:
             old_tb_logdir = osp.join(out_dir, "tb_old")
             mmcv.mkdir_or_exist(old_tb_logdir)
-            os.system("mv -v {} {}".format(osp.join(tb_logdir, "events.*"), old_tb_logdir))
+            event_paths = glob.glob(osp.join(tb_logdir, "events.*"))
+            for event_path in event_paths:
+                dst_path = osp.join(old_tb_logdir, osp.basename(event_path))
+                os.replace(event_path, dst_path)
 
-        tbx_event_writer = MyTensorboardXWriter(tb_logdir, backend="tensorboardX")
+        tbx_event_writer = MyTensorboardXWriter(tb_logdir, backend="pytorch")
         return tbx_event_writer
 
     def do_test(self, cfg, model, epoch=None, iteration=None):
@@ -169,12 +173,12 @@ class GDRN_Lite(LightningLite):
             dataset_len = len(data_loader.dataset.dataset)
             if data_loader_2 is not None:
                 dataset_len += len(data_loader_2.dataset.dataset)
-            iters_per_epoch = dataset_len // images_per_batch
+            iters_per_epoch = (dataset_len + images_per_batch - 1) // images_per_batch
         else:
             dataset_len = len(data_loader.dataset)
             if data_loader_2 is not None:
                 dataset_len += len(data_loader_2.dataset)
-            iters_per_epoch = dataset_len // images_per_batch
+            iters_per_epoch = (dataset_len + images_per_batch - 1) // images_per_batch
         max_iter = cfg.SOLVER.TOTAL_EPOCHS * iters_per_epoch
         dprint("images_per_batch: ", images_per_batch)
         dprint("dataset length: ", dataset_len)
@@ -192,8 +196,16 @@ class GDRN_Lite(LightningLite):
             optimizer=optimizer,
             scheduler=scheduler,
         )
-        if hasattr(self._precision_plugin, "scaler"):
-            extra_ckpt_dict["gradscaler"] = self._precision_plugin.scaler
+        precision_plugin = getattr(self, "_precision_plugin", None)
+        if precision_plugin is not None:
+            scaler = getattr(precision_plugin, "scaler", None)
+        else:
+            scaler = None
+        if scaler is None:
+            precision = getattr(self, "_precision", None)
+            scaler = getattr(precision, "scaler", None) if precision is not None else None
+        if scaler is not None:
+            extra_ckpt_dict["gradscaler"] = scaler
 
         checkpointer = MyCheckpointer(
             model,
@@ -227,7 +239,7 @@ class GDRN_Lite(LightningLite):
         with EventStorage(start_iter) as storage:
             for iteration in range(start_iter, max_iter):
                 storage.iter = iteration
-                epoch = iteration // dataset_len + 1
+                epoch = iteration // iters_per_epoch + 1
 
                 if np.random.rand() < train_2_ratio:
                     data = next(data_loader_2_iter)
@@ -302,7 +314,7 @@ class GDRN_Lite(LightningLite):
                             vis_i = 0
                             roi_img_vis = batch["roi_img"][vis_i].cpu().numpy()
                             roi_img_vis = denormalize_image(roi_img_vis, cfg).transpose(1, 2, 0).astype("uint8")
-                            tbx_writer.add_image("input_image", roi_img_vis, iteration)
+                            tbx_writer.add_image("input_image", roi_img_vis, iteration, dataformats="HWC")
 
                             out_coor_x = out_dict["coor_x"].detach()
                             out_coor_y = out_dict["coor_y"].detach()
@@ -311,19 +323,27 @@ class GDRN_Lite(LightningLite):
 
                             out_xyz_vis = out_xyz[vis_i].cpu().numpy().transpose(1, 2, 0)
                             out_xyz_vis = get_emb_show(out_xyz_vis)
-                            tbx_writer.add_image("out_xyz", out_xyz_vis, iteration)
+                            tbx_writer.add_image("out_xyz", out_xyz_vis, iteration, dataformats="HWC")
 
                             gt_xyz_vis = batch["roi_xyz"][vis_i].cpu().numpy().transpose(1, 2, 0)
                             gt_xyz_vis = get_emb_show(gt_xyz_vis)
-                            tbx_writer.add_image("gt_xyz", gt_xyz_vis, iteration)
+                            tbx_writer.add_image("gt_xyz", gt_xyz_vis, iteration, dataformats="HWC")
 
                             out_mask = out_dict["mask"].detach()
                             out_mask = get_out_mask(cfg, out_mask)
                             out_mask_vis = out_mask[vis_i, 0].cpu().numpy()
-                            tbx_writer.add_image("out_mask", out_mask_vis, iteration)
+                            tbx_writer.add_image("out_mask", out_mask_vis, iteration,dataformats="HW")
 
-                            gt_mask_vis = batch["roi_mask"][vis_i].detach().cpu().numpy()
-                            tbx_writer.add_image("gt_mask", gt_mask_vis, iteration)
+                            # 数据集中没有roi_mask统一键，优先可见掩码并兼容其他掩码键
+                            if "roi_mask" in batch:
+                                gt_mask_vis = batch["roi_mask"][vis_i].detach().cpu().numpy()
+                            elif "roi_mask_visib" in batch:
+                                gt_mask_vis = batch["roi_mask_visib"][vis_i].detach().cpu().numpy()
+                            elif "roi_mask_obj" in batch:
+                                gt_mask_vis = batch["roi_mask_obj"][vis_i].detach().cpu().numpy()
+                            else:
+                                gt_mask_vis = batch["roi_mask_trunc"][vis_i].detach().cpu().numpy()
+                            tbx_writer.add_image("gt_mask", gt_mask_vis, iteration, dataformats="HW")
 
                 if (iteration + 1) % periodic_checkpointer.period == 0 or (
                     periodic_checkpointer.max_iter is not None and (iteration + 1) >= periodic_checkpointer.max_iter

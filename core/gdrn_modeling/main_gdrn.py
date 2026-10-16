@@ -123,12 +123,19 @@ class Lite(GDRN_Lite):
 
         self.do_train(cfg, args, model, optimizer, resume=args.resume)
         torch.multiprocessing.set_sharing_strategy("file_system")
-        return self.do_test(cfg, model)
-
+        if cfg.TEST.get("DO_FINAL_EVAL", False):
+            return self.do_test(cfg, model)
+        if cfg.TEST.get("EVAL_PERIOD", 0) > 0:
+            return self.do_test(cfg, model)
+        return {}
 
 @loguru_logger.catch
 def main(args):
     cfg = setup(args)
+
+    if torch.cuda.is_available():
+        if hasattr(torch, "set_float32_matmul_precision"):
+            torch.set_float32_matmul_precision("high")
 
     logger.info(f"start to train with {args.num_machines} nodes and {args.num_gpus} GPUs")
     if args.num_gpus > 1 and args.strategy is None:
