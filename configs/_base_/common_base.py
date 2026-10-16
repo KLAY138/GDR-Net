@@ -16,7 +16,7 @@ SEED = -1
 CUDNN_BENCHMARK = True
 # The period (in terms of steps) for minibatch visualization at train time.
 # Set to 0 to disable.
-VIS_PERIOD = 0
+VIS_PERIOD = 8000
 
 # -----------------------------------------------------------------------------
 # Input
@@ -138,7 +138,7 @@ TRAIN = dict(
     VERBOSE=False,
     VIS=False,
     # vis imgs in tensorboard
-    VIS_IMG=False,
+    VIS_IMG=True,
 )
 # ---------------------------------------------------------------------------- #
 # Specific val options
