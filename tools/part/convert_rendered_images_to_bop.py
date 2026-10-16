@@ -33,17 +33,17 @@ def parse_pose_delta_from_stem(stem: str) -> Optional[PoseDelta]:
 
 def rot_x(rad: float) -> np.ndarray:
     c, s = math.cos(rad), math.sin(rad)
-    return np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]], dtype=np.float32)
+    return np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]], dtype=np.float64)
 
 
 def rot_y(rad: float) -> np.ndarray:
     c, s = math.cos(rad), math.sin(rad)
-    return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]], dtype=np.float32)
+    return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]], dtype=np.float64)
 
 
 def rot_z(rad: float) -> np.ndarray:
     c, s = math.cos(rad), math.sin(rad)
-    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=np.float32)
+    return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=np.float64)
 
 
 def delta_to_pose(
@@ -51,8 +51,19 @@ def delta_to_pose(
     t0_mm: np.ndarray,
     apply_rotation_left: bool,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    t = t0_mm.astype(np.float32).copy()
-    R0 = np.eye(3, dtype=np.float32)
+    t = t0_mm.astype(np.float64).copy()
+
+    # R_corr = np.array([
+    #     [1.0,  0.0,  0.0],
+    #     [0.0, -1.0,  0.0],
+    #     [0.0,  0.0, -1.0]
+    # ], dtype=np.float64)
+    # R0 = R_corr.copy()
+
+    R0 = np.eye(3, dtype=np.float64)
+
+
+
     if delta.kind == "trans":
         idx = {"x": 0, "y": 1, "z": 2}[delta.axis]
         t[idx] += float(delta.value)
@@ -170,7 +181,7 @@ def load_ply_xyz_binary_little_endian(path: str) -> np.ndarray:
         }
         dtype = np.dtype([(name, type_map[typ]) for name, typ in props])
         data = np.fromfile(f, dtype=dtype, count=vcount)
-    xyz = np.stack([data["x"], data["y"], data["z"]], axis=1).astype(np.float32)
+    xyz = np.stack([data["x"], data["y"], data["z"]], axis=1).astype(np.float64)
     return xyz
 
 
@@ -198,9 +209,9 @@ def render_depth_from_vertices(
     inside = (u >= 0) & (u < int(width)) & (v >= 0) & (v < int(height))
     u = u[inside]
     v = v[inside]
-    z = z[inside].astype(np.float32)
+    z = z[inside].astype(np.float64)
 
-    depth_flat = np.full((int(height) * int(width),), np.inf, dtype=np.float32)
+    depth_flat = np.full((int(height) * int(width),), np.inf, dtype=np.float64)
     lin = v.astype(np.int64) * int(width) + u.astype(np.int64)
     np.minimum.at(depth_flat, lin, z)
     depth = depth_flat.reshape(int(height), int(width))
@@ -212,12 +223,12 @@ def depth_to_xyz(depth: np.ndarray, K: np.ndarray) -> np.ndarray:
     h, w = depth.shape[:2]
     invK = np.linalg.inv(K.astype(np.float64))
     ys, xs = np.where(depth > 0)
-    xyz = np.zeros((h, w, 3), dtype=np.float32)
+    xyz = np.zeros((h, w, 3), dtype=np.float64)
     if len(xs) == 0:
         return xyz
     pix = np.stack([xs.astype(np.float64), ys.astype(np.float64), np.ones_like(xs, dtype=np.float64)], axis=0)  # 3xN
-    rays = (invK @ pix).T.astype(np.float32)  # Nx3
-    z = depth[ys, xs].astype(np.float32)
+    rays = (invK @ pix).T.astype(np.float64)  # Nx3
+    z = depth[ys, xs].astype(np.float64)
     xyz_vals = rays * z[:, None]
     xyz[ys, xs, :] = xyz_vals
     return xyz
@@ -258,7 +269,9 @@ def main() -> None:
     ap.add_argument("--k", default="636.82,0,635.21,0,637.21,362.37,0,0,1", type=str)
     ap.add_argument("--t0-mm", default="0,0,160", type=str)
     ap.add_argument("--mask-thr", default=8, type=int)
-    ap.add_argument("--apply-rotation-left", default=True, action=argparse.BooleanOptionalAction)
+    ap.add_argument("--apply-rotation-left", dest="apply_rotation_left", action="store_true")
+    ap.add_argument("--no-apply-rotation-left", dest="apply_rotation_left", action="store_false")
+    ap.set_defaults(apply_rotation_left=True)
     ap.add_argument("--gen-xyz", action="store_true")
     ap.add_argument("--model-ply", default="", type=str)
     ap.add_argument("--model-vertex-scale", default=1.0, type=float)
@@ -268,12 +281,12 @@ def main() -> None:
     k_vals = [float(x) for x in args.k.split(",")]
     if len(k_vals) != 9:
         raise ValueError("--k must contain 9 comma-separated numbers")
-    K = np.array(k_vals, dtype=np.float32).reshape(3, 3)
+    K = np.array(k_vals, dtype=np.float64).reshape(3, 3)
 
     t0_vals = [float(x) for x in args.t0_mm.split(",")]
     if len(t0_vals) != 3:
         raise ValueError("--t0-mm must contain 3 comma-separated numbers")
-    t0 = np.array(t0_vals, dtype=np.float32)
+    t0 = np.array(t0_vals, dtype=np.float64)
 
     model_xyz = None
     if args.gen_xyz:
@@ -338,11 +351,25 @@ def main() -> None:
             dst_mask_vis = osp.join(mask_visib_dir, f"{im_id:06d}_000000.png")
 
             gray = load_gray_u8(src_path)
+            h, w = gray.shape[:2]
             bg = estimate_background_value(gray)
             mask = make_mask_from_gray(gray, bg_value=bg, thr=int(args.mask_thr))
+
+            depth = None
+            xyz = None
+            if args.gen_xyz:
+                Rm2c = R.astype(np.float64)
+                tm2c_m = (t_mm.astype(np.float64) / 1000.0).reshape(1, 3)
+                verts_cam = (model_xyz @ Rm2c.T) + tm2c_m
+                depth = render_depth_from_vertices(verts_cam, K=K, width=w, height=h)
+                xyz = depth_to_xyz(depth, K=K)
+                render_mask = (depth > 0).astype(np.uint8) * 255
+                if int((render_mask > 0).sum()) > 0:
+                    mask = render_mask
+
             bbox_xywh = bbox_xywh_from_mask(mask)
             if bbox_xywh is None:
-                bbox_xywh = [0, 0, int(gray.shape[1]), int(gray.shape[0])]
+                bbox_xywh = [0, 0, int(w), int(h)]
 
             px_vis = int((mask > 0).sum())
             info = {
@@ -378,17 +405,10 @@ def main() -> None:
                 x1, y1, bw, bh = bbox_xywh
                 x2 = x1 + bw - 1
                 y2 = y1 + bh - 1
-                h, w = gray.shape[:2]
                 x1 = max(min(int(x1), w - 1), 0)
                 y1 = max(min(int(y1), h - 1), 0)
                 x2 = max(min(int(x2), w - 1), 0)
                 y2 = max(min(int(y2), h - 1), 0)
-
-                Rm2c = R.astype(np.float32)
-                tm2c_m = (t_mm.astype(np.float32) / 1000.0).reshape(1, 3)
-                verts_cam = (model_xyz @ Rm2c.T) + tm2c_m
-                depth = render_depth_from_vertices(verts_cam, K=K, width=w, height=h)
-                xyz = depth_to_xyz(depth, K=K)
                 xyz_crop = xyz[y1 : y2 + 1, x1 : x2 + 1, :].astype(np.float16)
                 xyz_path = osp.join(xyz_scene_root, f"{im_id:06d}_000000-xyz.pkl")
                 dump_pickle(xyz_path, {"xyz_crop": xyz_crop, "xyxy": [x1, y1, x2, y2]})

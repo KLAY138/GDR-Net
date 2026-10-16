@@ -79,7 +79,7 @@ class YCBV_BOP_TEST_Dataset:
             (
                 "".join([str(fn) for fn in self.objs])
                 + "dataset_dicts_{}_{}_{}_{}_{}".format(
-                    self.name, self.dataset_root, self.with_masks, self.with_depth, __name__
+                    self.name, self.dataset_root, self.with_masks, self.with_depth, self.scale_to_meter, __name__
                 )
             ).encode("utf-8")
         ).hexdigest()
@@ -127,7 +127,7 @@ class YCBV_BOP_TEST_Dataset:
 
                 scene_id = int(rgb_path.split("/")[-3])
 
-                cam = np.array(cam_dicts[scene_id][str_im_id]["cam_K"], dtype=np.float32).reshape(3, 3)
+                cam = np.array(cam_dicts[scene_id][str_im_id]["cam_K"], dtype=np.float64).reshape(3, 3)
                 depth_factor = 1000.0 / cam_dicts[scene_id][str_im_id]["depth_scale"]
                 record = {
                     "dataset_name": self.name,
@@ -149,7 +149,7 @@ class YCBV_BOP_TEST_Dataset:
                         continue
                     cur_label = self.cat2label[obj_id]  # 0-based label
                     R = np.array(anno["cam_R_m2c"], dtype="float32").reshape(3, 3)
-                    t = np.array(anno["cam_t_m2c"], dtype="float32") / 1000.0
+                    t = np.array(anno["cam_t_m2c"], dtype="float32") * self.scale_to_meter
                     pose = np.hstack([R, t.reshape(3, 1)])
                     quat = mat2quat(R).astype("float32")
 
@@ -226,7 +226,32 @@ class YCBV_BOP_TEST_Dataset:
         models_info_path = osp.join(self.models_root, "models_info.json")
         assert osp.exists(models_info_path), models_info_path
         models_info = mmcv.load(models_info_path)  # key is str(obj_id)
-        return models_info
+        scaled = {}
+        for obj_id, info in models_info.items():
+            if not isinstance(info, dict):
+                scaled[obj_id] = info
+                continue
+            new_info = dict(info)
+            for k in ["diameter", "size_x", "size_y", "size_z", "min_x", "min_y", "min_z"]:
+                if k in new_info:
+                    new_info[k] = float(new_info[k]) * self.scale_to_meter
+            if "symmetries_discrete" in new_info:
+                new_syms = []
+                for sym in new_info["symmetries_discrete"]:
+                    sym_4x4 = np.array(sym, dtype=np.float64).reshape(4, 4)
+                    sym_4x4[:3, 3] *= self.scale_to_meter
+                    new_syms.append(sym_4x4.reshape(-1).tolist())
+                new_info["symmetries_discrete"] = new_syms
+            if "symmetries_continuous" in new_info:
+                new_syms = []
+                for sym in new_info["symmetries_continuous"]:
+                    new_sym = dict(sym)
+                    if "offset" in new_sym:
+                        new_sym["offset"] = (np.array(new_sym["offset"], dtype=np.float64) * self.scale_to_meter).tolist()
+                    new_syms.append(new_sym)
+                new_info["symmetries_continuous"] = new_syms
+            scaled[obj_id] = new_info
+        return scaled
 
     @lazy_property
     def models(self):
@@ -269,7 +294,7 @@ def get_ycbv_metadata(obj_names, ref_key):
         model_info = loaded_models_info[str(obj_id)]
         if "symmetries_discrete" in model_info or "symmetries_continuous" in model_info:
             sym_transforms = misc.get_symmetry_transformations(model_info, max_sym_disc_step=0.01)
-            sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float32)
+            sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float64)
         else:
             sym_info = None
         cur_sym_infos[i] = sym_info

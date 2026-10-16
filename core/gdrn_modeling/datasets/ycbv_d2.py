@@ -97,27 +97,45 @@ class YCBV_Dataset:
         scene_gt_dicts = {}
         scene_gt_info_dicts = {}
         scene_cam_dicts = {}
-        scene_im_ids = []  # store tuples of (scene_id, im_id)
+
+        scene_im_ids = []
         with open(idx_file, "r") as f:
             for line in f:
-                line_split = line.strip("\r\n").split("/")
+                line = line.strip("\r\n")
+                if not line:
+                    continue
+                line_split = line.split("/")
                 scene_id = int(line_split[0])
                 im_id = int(line_split[1])
                 scene_im_ids.append((scene_id, im_id))
-                if scene_id not in scene_gt_dicts:
-                    scene_gt_file = osp.join(image_root, f"{scene_id:06d}/scene_gt.json")
-                    assert osp.exists(scene_gt_file), scene_gt_file
-                    scene_gt_dicts[scene_id] = mmcv.load(scene_gt_file)
 
-                if scene_id not in scene_gt_info_dicts:
-                    scene_gt_info_file = osp.join(image_root, f"{scene_id:06d}/scene_gt_info.json")
-                    assert osp.exists(scene_gt_info_file), scene_gt_info_file
-                    scene_gt_info_dicts[scene_id] = mmcv.load(scene_gt_info_file)
+        if self.ref_key == "part" and self.name == "part_train" and len(scene_im_ids) <= 10:
+            scene_im_ids = []
+            for scene_dir in sorted(os.listdir(image_root)):
+                if not (len(scene_dir) == 6 and scene_dir.isdigit()):
+                    continue
+                scene_id = int(scene_dir)
+                scene_gt_file = osp.join(image_root, f"{scene_id:06d}/scene_gt.json")
+                scene_gt_info_file = osp.join(image_root, f"{scene_id:06d}/scene_gt_info.json")
+                scene_cam_file = osp.join(image_root, f"{scene_id:06d}/scene_camera.json")
+                if not (osp.exists(scene_gt_file) and osp.exists(scene_gt_info_file) and osp.exists(scene_cam_file)):
+                    continue
+                gt_dict = mmcv.load(scene_gt_file)
+                for str_im_id in gt_dict.keys():
+                    scene_im_ids.append((scene_id, int(str_im_id)))
 
-                if scene_id not in scene_cam_dicts:
-                    scene_cam_file = osp.join(image_root, f"{scene_id:06d}/scene_camera.json")
-                    assert osp.exists(scene_cam_file), scene_cam_file
-                    scene_cam_dicts[scene_id] = mmcv.load(scene_cam_file)
+        for scene_id in sorted({s for s, _ in scene_im_ids}):
+            scene_gt_file = osp.join(image_root, f"{scene_id:06d}/scene_gt.json")
+            assert osp.exists(scene_gt_file), scene_gt_file
+            scene_gt_dicts[scene_id] = mmcv.load(scene_gt_file)
+
+            scene_gt_info_file = osp.join(image_root, f"{scene_id:06d}/scene_gt_info.json")
+            assert osp.exists(scene_gt_info_file), scene_gt_info_file
+            scene_gt_info_dicts[scene_id] = mmcv.load(scene_gt_info_file)
+
+            scene_cam_file = osp.join(image_root, f"{scene_id:06d}/scene_camera.json")
+            assert osp.exists(scene_cam_file), scene_cam_file
+            scene_cam_dicts[scene_id] = mmcv.load(scene_cam_file)
         ######################################################
         scene_im_ids = sorted(scene_im_ids)  # sort to make it reproducible
         dataset_dicts = []
@@ -133,7 +151,7 @@ class YCBV_Dataset:
             scene_im_id = f"{scene_id}/{im_id}"
 
             # for ycbv/tless, load cam K from image infos
-            cam_anno = np.array(scene_cam_dicts[scene_id][str_im_id]["cam_K"], dtype=np.float32).reshape(3, 3)
+            cam_anno = np.array(scene_cam_dicts[scene_id][str_im_id]["cam_K"], dtype=np.float64).reshape(3, 3)
             depth_factor = 1000.0 / scene_cam_dicts[scene_id][str_im_id]["depth_scale"]
             # dprint(record['cam'])
             if "/train_synt/" in rgb_path:
@@ -169,7 +187,7 @@ class YCBV_Dataset:
                 cur_label = self.cat2label[obj_id]
                 ################ pose ###########################
                 R = np.array(anno["cam_R_m2c"], dtype="float32").reshape(3, 3)
-                trans = np.array(anno["cam_t_m2c"], dtype="float32") / 1000.0  # mm->m
+                trans = np.array(anno["cam_t_m2c"], dtype="float32") * self.scale_to_meter
                 pose = np.hstack([R, trans.reshape(3, 1)])
                 quat = mat2quat(pose[:3, :3])
 
@@ -269,11 +287,27 @@ class YCBV_Dataset:
         load the annotations of all images into memory.
         """
         # cache the dataset_dicts to avoid loading masks from files
+        auto_index = False
+        if self.ref_key == "part" and self.name == "part_train" and len(self.ann_files) == 1:
+            try:
+                with open(self.ann_files[0], "r") as f:
+                    lines = [ln.strip("\r\n") for ln in f.readlines() if ln.strip("\r\n")]
+                auto_index = len(lines) <= 10
+            except Exception:
+                auto_index = True
+
         hashed_file_name = hashlib.md5(
             (
                 "".join([str(fn) for fn in self.objs])
-                + "dataset_dicts_{}_{}_{}_{}_{}_{}".format(
-                    self.name, self.dataset_root, self.with_masks, self.with_depth, self.with_xyz, __name__
+                + "dataset_dicts_{}_{}_{}_{}_{}_{}_{}_{}".format(
+                    self.name,
+                    self.dataset_root,
+                    self.with_masks,
+                    self.with_depth,
+                    self.with_xyz,
+                    self.scale_to_meter,
+                    int(auto_index),
+                    __name__,
                 )
             ).encode("utf-8")
         ).hexdigest()
@@ -307,7 +341,32 @@ class YCBV_Dataset:
         models_info_path = osp.join(self.models_root, "models_info.json")
         assert osp.exists(models_info_path), models_info_path
         models_info = mmcv.load(models_info_path)  # key is str(obj_id)
-        return models_info
+        scaled = {}
+        for obj_id, info in models_info.items():
+            if not isinstance(info, dict):
+                scaled[obj_id] = info
+                continue
+            new_info = dict(info)
+            for k in ["diameter", "size_x", "size_y", "size_z", "min_x", "min_y", "min_z"]:
+                if k in new_info:
+                    new_info[k] = float(new_info[k]) * self.scale_to_meter
+            if "symmetries_discrete" in new_info:
+                new_syms = []
+                for sym in new_info["symmetries_discrete"]:
+                    sym_4x4 = np.array(sym, dtype=np.float64).reshape(4, 4)
+                    sym_4x4[:3, 3] *= self.scale_to_meter
+                    new_syms.append(sym_4x4.reshape(-1).tolist())
+                new_info["symmetries_discrete"] = new_syms
+            if "symmetries_continuous" in new_info:
+                new_syms = []
+                for sym in new_info["symmetries_continuous"]:
+                    new_sym = dict(sym)
+                    if "offset" in new_sym:
+                        new_sym["offset"] = (np.array(new_sym["offset"], dtype=np.float64) * self.scale_to_meter).tolist()
+                    new_syms.append(new_sym)
+                new_info["symmetries_continuous"] = new_syms
+            scaled[obj_id] = new_info
+        return scaled
 
     @lazy_property
     def models(self):
@@ -350,7 +409,7 @@ def get_ycbv_metadata(obj_names, ref_key):
         model_info = loaded_models_info[str(obj_id)]
         if "symmetries_discrete" in model_info or "symmetries_continuous" in model_info:
             sym_transforms = misc.get_symmetry_transformations(model_info, max_sym_disc_step=0.01)
-            sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float32)
+            sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float64)
         else:
             sym_info = None
         cur_sym_infos[i] = sym_info
@@ -498,7 +557,7 @@ SPLITS_YCBV["part_train"] = dict(
     objs=ref.part.objects,
     ann_files=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/image_sets/train.txt")],
     image_prefixes=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/train")],
-    scale_to_meter=1.0,
+    scale_to_meter=0.001,
     with_masks=True,
     with_depth=False,
     with_xyz=True,
@@ -519,7 +578,7 @@ SPLITS_YCBV["part_test"] = dict(
     objs=ref.part.objects,
     ann_files=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/image_sets/test.txt")],
     image_prefixes=[osp.join(DATASETS_ROOT, "BOP_DATASETS/part/test")],
-    scale_to_meter=1.0,
+    scale_to_meter=0.001,
     with_masks=True,
     with_depth=False,
     with_xyz=False,
@@ -611,8 +670,8 @@ def test_vis():
                 xyz_path = annos[_i]["xyz_path"]
                 xyz_info = mmcv.load(xyz_path)
                 x1, y1, x2, y2 = xyz_info["xyxy"]
-                xyz_crop = xyz_info["xyz_crop"].astype(np.float32)
-                xyz = np.zeros((imH, imW, 3), dtype=np.float32)
+                xyz_crop = xyz_info["xyz_crop"].astype(np.float64)
+                xyz = np.zeros((imH, imW, 3), dtype=np.float64)
                 xyz[y1 : y2 + 1, x1 : x2 + 1, :] = xyz_crop
                 xyz_show = get_emb_show(xyz)
                 xyz_crop_show = get_emb_show(xyz_crop)

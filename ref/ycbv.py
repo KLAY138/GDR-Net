@@ -98,7 +98,32 @@ def get_models_info():
     models_info_path = osp.join(model_dir, "models_info.json")
     assert osp.exists(models_info_path), models_info_path
     models_info = mmcv.load(models_info_path)  # key is str(obj_id)
-    return models_info
+    scaled = {}
+    for obj_id, info in models_info.items():
+        if not isinstance(info, dict):
+            scaled[obj_id] = info
+            continue
+        new_info = dict(info)
+        for k in ["diameter", "size_x", "size_y", "size_z", "min_x", "min_y", "min_z"]:
+            if k in new_info:
+                new_info[k] = float(new_info[k]) * vertex_scale
+        if "symmetries_discrete" in new_info:
+            new_syms = []
+            for sym in new_info["symmetries_discrete"]:
+                sym_4x4 = np.array(sym, dtype=np.float64).reshape(4, 4)
+                sym_4x4[:3, 3] *= vertex_scale
+                new_syms.append(sym_4x4.reshape(-1).tolist())
+            new_info["symmetries_discrete"] = new_syms
+        if "symmetries_continuous" in new_info:
+            new_syms = []
+            for sym in new_info["symmetries_continuous"]:
+                new_sym = dict(sym)
+                if "offset" in new_sym:
+                    new_sym["offset"] = (np.array(new_sym["offset"], dtype=np.float64) * vertex_scale).tolist()
+                new_syms.append(new_sym)
+            new_info["symmetries_continuous"] = new_syms
+        scaled[obj_id] = new_info
+    return scaled
 
 
 def get_fps_points():

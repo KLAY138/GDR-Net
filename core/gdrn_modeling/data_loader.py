@@ -293,7 +293,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
             model_info = loaded_models_info[str(obj_id)]
             if "symmetries_discrete" in model_info or "symmetries_continuous" in model_info:
                 sym_transforms = misc.get_symmetry_transformations(model_info, max_sym_disc_step=0.01)
-                sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float32)
+                sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float64)
             else:
                 sym_info = None
             cur_sym_infos[i] = sym_info
@@ -315,6 +315,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
         # should be consistent with the size in dataset_dict
         utils.check_image_size(dataset_dict, image)
         im_H_ori, im_W_ori = image.shape[:2]
+        mask_trunc = None
 
         # currently only replace bg for train ###############################
         if self.split == "train":
@@ -331,8 +332,6 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
                     assert "segmentation" in dataset_dict["inst_infos"]
                     mask = cocosegm2mask(dataset_dict["inst_infos"]["segmentation"], im_H_ori, im_W_ori)
                     image, mask_trunc = self.replace_bg(image.copy(), mask, return_mask=True)
-                else:
-                    mask_trunc = None
 
         # NOTE: maybe add or change color augment here ===================================
         if self.split == "train" and self.color_aug_prob > 0 and self.color_augmentor is not None:
@@ -345,6 +344,8 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
         # other transforms (mainly geometric ones);
         # for 6d pose task, flip is now allowed in general except for some 2d keypoints methods
         image, transforms = T.apply_augmentations(self.augmentation, image)
+        if mask_trunc is not None:
+            mask_trunc = transforms.apply_segmentation(mask_trunc.astype("uint8")).astype(bool)
         im_H, im_W = image_shape = image.shape[:2]  # h, w
 
         # NOTE: scale camera intrinsic if necessary ================================
@@ -400,7 +401,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
 
                 roi_cls = inst_infos["category_id"]
                 roi_infos["roi_cls"].append(roi_cls)
-                roi_infos["score"].append(inst_infos["score"])
+                roi_infos["score"].append(inst_infos.get("score", 1.0))
 
                 # extent
                 roi_extent = self._get_extents(dataset_name)[roi_cls]
@@ -419,7 +420,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
 
                 roi_infos["bbox_center"].append(bbox_center.astype("float32"))
                 roi_infos["scale"].append(scale)
-                roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
+                roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float64))
                 roi_infos["resize_ratio"].append(out_res / scale)
 
                 # CHW, float32 tensor
@@ -460,14 +461,26 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
         dataset_dict["roi_extent"] = torch.as_tensor(np.array(roi_extent), dtype=torch.float32)
 
         # load xyz =======================================================
-        xyz_info = mmcv.load(inst_infos["xyz_path"])
+        try:
+            xyz_info = mmcv.load(inst_infos["xyz_path"])
+        except ModuleNotFoundError as exc:
+            if "numpy._core" not in str(exc):
+                raise
+            import sys as _sys
+            import numpy as _np
+
+            _sys.modules.setdefault("numpy._core", _np.core)
+            _sys.modules.setdefault("numpy._core.multiarray", _np.core.multiarray)
+            _sys.modules.setdefault("numpy._core._multiarray_umath", _np.core._multiarray_umath)
+            xyz_info = mmcv.load(inst_infos["xyz_path"])
         x1, y1, x2, y2 = xyz_info["xyxy"]
         # float16 does not affect performance (classification/regresion)
         xyz_crop = xyz_info["xyz_crop"]
-        xyz = np.zeros((im_H, im_W, 3), dtype=np.float32)
+        xyz = np.zeros((im_H_ori, im_W_ori, 3), dtype=np.float32)
         xyz[y1 : y2 + 1, x1 : x2 + 1, :] = xyz_crop
+        xyz = transforms.apply_image(xyz)
         # NOTE: full mask
-        mask_obj = ((xyz[:, :, 0] != 0) | (xyz[:, :, 1] != 0) | (xyz[:, :, 2] != 0)).astype(np.bool).astype(np.float32)
+        mask_obj = ((xyz[:, :, 0] != 0) | (xyz[:, :, 1] != 0) | (xyz[:, :, 2] != 0)).astype(bool).astype(np.float64)
         if cfg.INPUT.SMOOTH_XYZ:
             xyz = self.smooth_xyz(xyz)
 
@@ -624,7 +637,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
         dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
         dataset_dict["scale"] = scale
         dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
-        dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float32))
+        dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float64))
         dataset_dict["resize_ratio"] = resize_ratio = out_res / scale
         z_ratio = inst_infos["trans"][2] / resize_ratio
         obj_center = anno["centroid_2d"]
@@ -634,7 +647,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
 
     def smooth_xyz(self, xyz):
         """smooth the edge areas to reduce noise."""
-        xyz = np.asarray(xyz, np.float32)
+        xyz = np.asarray(xyz, np.float64)
         xyz_blur = cv2.medianBlur(xyz, 3)
         edges = get_edge(xyz)
         xyz[edges != 0] = xyz_blur[edges != 0]

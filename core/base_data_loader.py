@@ -245,7 +245,7 @@ class Base_DatasetFromList(data.Dataset):
     def _color_aug(self, image, aug_type="ROI10D"):
         # assume image in [0, 255] uint8
         if aug_type.lower() == "roi10d":  # need normalized image in [0,1]
-            image = np.asarray(image / 255.0, dtype=np.float32).copy()
+            image = np.asarray(image / 255.0, dtype=np.float64).copy()
             image = self.color_augmentor.augment(image)
             image = (image * 255.0 + 0.5).astype(np.uint8)
             return image
@@ -274,11 +274,12 @@ class Base_DatasetFromList(data.Dataset):
             logger.info("get bg_paths from cache file: {}".format(cache_path))
             bg_img_paths = mmcv.load(cache_path)
             logger.info("num bg imgs: {}".format(len(bg_img_paths)))
-            assert len(bg_img_paths) > 0
             return bg_img_paths
 
         logger.info("building bg imgs cache {}...".format(bg_type))
-        assert osp.exists(bg_root), f"BG ROOT: {bg_root} does not exist"
+        if not osp.exists(bg_root):
+            logger.warning(f"BG ROOT: {bg_root} does not exist, disable background replacement")
+            return []
         if bg_type == "coco":
             img_paths = [
                 osp.join(bg_root, fn.name) for fn in os.scandir(bg_root) if ".png" in fn.name or "jpg" in fn.name
@@ -307,20 +308,26 @@ class Base_DatasetFromList(data.Dataset):
             ]
         else:
             raise ValueError(f"BG_TYPE: {bg_type} is not supported")
-        assert len(img_paths) > 0, len(img_paths)
+        if len(img_paths) == 0:
+            logger.warning(f"No background images found under {bg_root}, disable background replacement")
+            return []
 
         num_bg_imgs = min(len(img_paths), cfg.INPUT.NUM_BG_IMGS)
         bg_img_paths = np.random.choice(img_paths, num_bg_imgs)
 
         mmcv.dump(bg_img_paths, cache_path)
         logger.info("num bg imgs: {}".format(len(bg_img_paths)))
-        assert len(bg_img_paths) > 0
         return bg_img_paths
 
     def replace_bg(self, im, im_mask, return_mask=False):
         cfg = self.cfg
         # add background to the image
         H, W = im.shape[:2]
+        if len(self._bg_img_paths) == 0:
+            mask = im_mask.copy().astype(bool)
+            if return_mask:
+                return im.astype(np.uint8), mask
+            return im.astype(np.uint8)
         ind = random.randint(0, len(self._bg_img_paths) - 1)
         filename = self._bg_img_paths[ind]
         if cfg.INPUT.get("BG_KEEP_ASPECT_RATIO", True):
@@ -332,7 +339,7 @@ class Base_DatasetFromList(data.Dataset):
             bg_img = np.zeros((H, W, 3), dtype=np.uint8)
             logger.warning("bad background image: {}".format(filename))
 
-        mask = im_mask.copy().astype(np.bool)
+        mask = im_mask.copy().astype(bool)
         if cfg.INPUT.get("TRUNCATE_FG", False):
             nonzeros = np.nonzero(mask.astype(np.uint8))
             x1, y1 = np.min(nonzeros, axis=1)
