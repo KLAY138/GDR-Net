@@ -44,6 +44,17 @@ class GDRN(nn.Module):
         self.cfg = cfg
         self.concat = cfg.MODEL.CDPN.ROT_HEAD.ROT_CONCAT
         self.r_out_dim, self.mask_out_dim, self.region_out_dim = get_xyz_mask_region_out_dim(cfg)
+        self.uncert_cfg = cfg.MODEL.CDPN.get("UNCERTAINTY", {})
+        self.use_uncertainty_branch = self.uncert_cfg.get("USE_UNCERTAINTY_BRANCH", False)
+        self.uncert_use_as_pnp_feature = self.uncert_cfg.get("UNCERT_USE_AS_PNP_FEATURE", True)
+        self.uncert_feature_type = self.uncert_cfg.get("UNCERT_FEATURE_TYPE", "weight_map")
+        if cfg.MODEL.CDPN.ROT_HEAD.XYZ_LOSS_TYPE in ["CE_coor", "CE"]:
+            self.uncert_in_dim = self.r_out_dim - 3
+        else:
+            self.uncert_in_dim = self.r_out_dim
+        if self.use_uncertainty_branch:
+            self.uncert_head = nn.Conv2d(self.uncert_in_dim, 1, kernel_size=1, padding=0, bias=True)
+            nn.init.constant_(self.uncert_head.bias, float(self.uncert_cfg.get("UNCERT_INIT_BIAS", 0.0)))
 
         # uncertainty multi-task loss weighting
         # https://github.com/Hui-Li/multi-task-learning-example-PyTorch/blob/master/multi-task-learning-example-PyTorch.ipynb
@@ -161,9 +172,23 @@ class GDRN(nn.Module):
         else:
             coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
 
+        pred_log_var = None
+        if self.use_uncertainty_branch:
+            pred_log_var = self.uncert_head(coor_feat)
+            log_var_clamped = pred_log_var.clamp(
+                min=float(self.uncert_cfg.get("UNCERT_LOGVAR_CLAMP_MIN", -10.0)),
+                max=float(self.uncert_cfg.get("UNCERT_LOGVAR_CLAMP_MAX", 4.0)),
+            )
+            # clamp log_var避免方差和梯度数值不稳定
+            weight_map = torch.exp(-log_var_clamped)
+            uncert_feat = log_var_clamped if self.uncert_feature_type == "log_var" else weight_map
+
         if pnp_net_cfg.WITH_2D_COORD:
             assert roi_coord_2d is not None
             coor_feat = torch.cat([coor_feat, roi_coord_2d], dim=1)
+        if self.use_uncertainty_branch and self.uncert_use_as_pnp_feature:
+            # uncertainty只做特征拼接，不能直接缩放坐标值以免破坏几何语义
+            coor_feat = torch.cat([coor_feat, uncert_feat], dim=1)
 
         # NOTE: for region, the 1st dim is bg
         region_softmax = F.softmax(region[:, 1:, :, :], dim=1)
@@ -232,6 +257,8 @@ class GDRN(nn.Module):
 
         if not do_loss:  # test
             out_dict = {"rot": pred_ego_rot, "trans": pred_trans}
+            if pred_log_var is not None:
+                out_dict["pred_log_var"] = pred_log_var
             if cfg.TEST.USE_PNP:
                 # TODO: move the pnp/ransac inside forward
                 out_dict.update({"mask": mask, "coor_x": coor_x, "coor_y": coor_y, "coor_z": coor_z, "region": region})
@@ -273,6 +300,7 @@ class GDRN(nn.Module):
                 out_x=coor_x,
                 out_y=coor_y,
                 out_z=coor_z,
+                pred_log_var=pred_log_var,
                 gt_xyz=gt_xyz,
                 gt_xyz_bin=gt_xyz_bin,
                 out_region=region,
@@ -302,6 +330,10 @@ class GDRN(nn.Module):
             storage = get_event_storage()
             storage.put_scalars(**vis_dict)
 
+            # 训练可视化需要这些中间输出（engine.py里VIS_IMG会读取）
+            out_dict = {"coor_x": coor_x, "coor_y": coor_y, "coor_z": coor_z, "mask": mask}
+            if pred_log_var is not None:
+                out_dict["pred_log_var"] = pred_log_var
             return out_dict, loss_dict
         return out_dict
 
@@ -315,6 +347,7 @@ class GDRN(nn.Module):
         out_x,
         out_y,
         out_z,
+        pred_log_var,
         gt_xyz,
         gt_xyz_bin,
         out_region,
@@ -342,17 +375,40 @@ class GDRN(nn.Module):
         if not r_head_cfg.FREEZE:
             xyz_loss_type = r_head_cfg.XYZ_LOSS_TYPE
             gt_mask_xyz = gt_masks[r_head_cfg.XYZ_LOSS_MASK_GT]
+            use_uncertainty_xyz = (
+                self.use_uncertainty_branch
+                and self.uncert_cfg.get("UNCERT_USE_HETERO_XYZ_LOSS", True)
+                and (pred_log_var is not None)
+                and xyz_loss_type == "L1"
+            )
             if xyz_loss_type == "L1":
-                loss_func = nn.L1Loss(reduction="sum")
-                loss_dict["loss_coor_x"] = loss_func(
-                    out_x * gt_mask_xyz[:, None], gt_xyz[:, 0:1] * gt_mask_xyz[:, None]
-                ) / gt_mask_xyz.sum().float().clamp(min=1.0)
-                loss_dict["loss_coor_y"] = loss_func(
-                    out_y * gt_mask_xyz[:, None], gt_xyz[:, 1:2] * gt_mask_xyz[:, None]
-                ) / gt_mask_xyz.sum().float().clamp(min=1.0)
-                loss_dict["loss_coor_z"] = loss_func(
-                    out_z * gt_mask_xyz[:, None], gt_xyz[:, 2:3] * gt_mask_xyz[:, None]
-                ) / gt_mask_xyz.sum().float().clamp(min=1.0)
+                if use_uncertainty_xyz:
+                    log_var_clamped = pred_log_var.clamp(
+                        min=float(self.uncert_cfg.get("UNCERT_LOGVAR_CLAMP_MIN", -10.0)),
+                        max=float(self.uncert_cfg.get("UNCERT_LOGVAR_CLAMP_MAX", 4.0)),
+                    )
+                    weight_map = torch.exp(-log_var_clamped)
+                    mask_xyz = gt_mask_xyz[:, None]
+                    valid_sum = gt_mask_xyz.sum().float().clamp(min=1.0)
+
+                    # 异方差损失以exp(-log_var)*误差 + log_var自适应平衡难易区域
+                    base_err_x = torch.abs(out_x - gt_xyz[:, 0:1])
+                    base_err_y = torch.abs(out_y - gt_xyz[:, 1:2])
+                    base_err_z = torch.abs(out_z - gt_xyz[:, 2:3])
+                    loss_dict["loss_coor_x"] = ((weight_map * base_err_x + log_var_clamped) * mask_xyz).sum() / valid_sum
+                    loss_dict["loss_coor_y"] = ((weight_map * base_err_y + log_var_clamped) * mask_xyz).sum() / valid_sum
+                    loss_dict["loss_coor_z"] = ((weight_map * base_err_z + log_var_clamped) * mask_xyz).sum() / valid_sum
+                else:
+                    loss_func = nn.L1Loss(reduction="sum")
+                    loss_dict["loss_coor_x"] = loss_func(
+                        out_x * gt_mask_xyz[:, None], gt_xyz[:, 0:1] * gt_mask_xyz[:, None]
+                    ) / gt_mask_xyz.sum().float().clamp(min=1.0)
+                    loss_dict["loss_coor_y"] = loss_func(
+                        out_y * gt_mask_xyz[:, None], gt_xyz[:, 1:2] * gt_mask_xyz[:, None]
+                    ) / gt_mask_xyz.sum().float().clamp(min=1.0)
+                    loss_dict["loss_coor_z"] = loss_func(
+                        out_z * gt_mask_xyz[:, None], gt_xyz[:, 2:3] * gt_mask_xyz[:, None]
+                    ) / gt_mask_xyz.sum().float().clamp(min=1.0)
             elif xyz_loss_type == "CE_coor":
                 gt_xyz_bin = gt_xyz_bin.long()
                 loss_func = CrossEntropyHeatmapLoss(reduction="sum", weight=None)  # r_head_cfg.XYZ_BIN+1
@@ -370,6 +426,10 @@ class GDRN(nn.Module):
             loss_dict["loss_coor_x"] *= r_head_cfg.XYZ_LW
             loss_dict["loss_coor_y"] *= r_head_cfg.XYZ_LW
             loss_dict["loss_coor_z"] *= r_head_cfg.XYZ_LW
+            if use_uncertainty_xyz:
+                loss_dict["loss_uncert_xyz"] = (
+                    (loss_dict["loss_coor_x"] + loss_dict["loss_coor_y"] + loss_dict["loss_coor_z"]) / 3.0
+                ) * float(self.uncert_cfg.get("UNCERT_LOSS_WEIGHT", 1.0))
 
         # mask loss ----------------------------------
         if not r_head_cfg.FREEZE:
@@ -516,6 +576,8 @@ class GDRN(nn.Module):
         if cfg.MODEL.CDPN.USE_MTL:
             for _k in loss_dict:
                 _name = _k.replace("loss_", "log_var_")
+                if not hasattr(self, _name):
+                    continue
                 cur_log_var = getattr(self, _name)
                 loss_dict[_k] = loss_dict[_k] * torch.exp(-cur_log_var) + torch.log(1 + torch.exp(cur_log_var))
         return loss_dict
@@ -552,6 +614,7 @@ def build_model_optimizer(cfg):
     r_head_cfg = cfg.MODEL.CDPN.ROT_HEAD
     t_head_cfg = cfg.MODEL.CDPN.TRANS_HEAD
     pnp_net_cfg = cfg.MODEL.CDPN.PNP_NET
+    uncert_cfg = cfg.MODEL.CDPN.get("UNCERTAINTY", {})
 
     if "resnet" in backbone_cfg.ARCH:
         params_lr_list = []
@@ -645,6 +708,8 @@ def build_model_optimizer(cfg):
 
         if pnp_net_cfg.MASK_ATTENTION in ["concat"]:  # do not add dim for none/mul
             pnp_net_in_channel += 1
+        if uncert_cfg.get("USE_UNCERTAINTY_BRANCH", False) and uncert_cfg.get("UNCERT_USE_AS_PNP_FEATURE", True):
+            pnp_net_in_channel += 1
 
         if pnp_net_cfg.ROT_TYPE in ["allo_quat", "ego_quat"]:
             rot_dim = 4
@@ -696,6 +761,13 @@ def build_model_optimizer(cfg):
 
         # CDPN (Coordinates-based Disentangled Pose Network)
         model = GDRN(cfg, backbone_net, rot_head_net, trans_head_net=trans_head_net, pnp_net=pnp_net)
+        if uncert_cfg.get("USE_UNCERTAINTY_BRANCH", False):
+            params_lr_list.append(
+                {
+                    "params": filter(lambda p: p.requires_grad, model.uncert_head.parameters()),
+                    "lr": float(cfg.SOLVER.BASE_LR),
+                }
+            )
         if cfg.MODEL.CDPN.USE_MTL:
             params_lr_list.append(
                 {

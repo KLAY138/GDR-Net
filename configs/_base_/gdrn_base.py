@@ -55,6 +55,16 @@ MODEL = dict(
             REGION_LOSS_MASK_GT="visib",  # trunc | visib | obj
             REGION_LW=1.0,
         ),
+        UNCERTAINTY=dict(
+            USE_UNCERTAINTY_BRANCH=False,
+            UNCERT_LOGVAR_CLAMP_MIN=-10.0,
+            UNCERT_LOGVAR_CLAMP_MAX=4.0,
+            UNCERT_LOSS_WEIGHT=1.0,
+            UNCERT_USE_HETERO_XYZ_LOSS=True,
+            UNCERT_USE_AS_PNP_FEATURE=True,
+            UNCERT_FEATURE_TYPE="weight_map",  # weight_map | log_var
+            UNCERT_INIT_BIAS=0.0,
+        ),
         ## for direct regression
         PNP_NET=dict(
             FREEZE=False,
