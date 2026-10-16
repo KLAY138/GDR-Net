@@ -48,3 +48,16 @@ dist/
 
 # project dirs
 /models
+
+# Local development artifacts and credentials
+*.log
+*.pt
+*.ckpt
+*.safetensors
+.env
+.env.*
+*.pem
+*.key
+.cache/
+.venv*/
+wandb/
