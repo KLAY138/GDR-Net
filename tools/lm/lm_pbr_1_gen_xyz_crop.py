@@ -126,7 +126,7 @@ class XyzGen(object):
                         )
                         print(f"{save_path}")
                         xyz_info = {
-                            "xyz_crop": np.zeros((IM_H, IM_W, 3), dtype=np.float6416),
+                            "xyz_crop": np.zeros((IM_H, IM_W, 3), dtype=np.float16),
                             "xyxy": [0, 0, IM_W - 1, IM_H - 1],
                         }
                         if VIS:

@@ -103,7 +103,7 @@ class Camera(object):
 
         Kinv = np.linalg.pinv(K)
 
-        p = np.array([r, c, 1], dtype=np.float6464)
+        p = np.array([r, c, 1], dtype=np.float64)
         d = np.dot(Kinv, p)
 
         eps = 1e-7
@@ -160,7 +160,7 @@ class Camera(object):
                 [0, 0, A, B],
                 [0, 0, -1, 0],
             ],
-            dtype=np.float6464,
+            dtype=np.float64,
         )
         ortho = (
             Camera.__glOrtho__(0, W, H, 0, near, far)
@@ -212,7 +212,7 @@ class Camera(object):
                 [0.0, 0.0, -2.0 / (farVal - nearVal), tz],
                 [0.0, 0.0, 0.0, 1.0],
             ],
-            dtype=np.float6464,
+            dtype=np.float64,
         )
 
     @property

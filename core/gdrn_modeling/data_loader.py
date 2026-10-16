@@ -647,7 +647,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
 
     def smooth_xyz(self, xyz):
         """smooth the edge areas to reduce noise."""
-        xyz = np.asarray(xyz, np.float64)
+        xyz = np.asarray(xyz, np.float32)
         xyz_blur = cv2.medianBlur(xyz, 3)
         edges = get_edge(xyz)
         xyz[edges != 0] = xyz_blur[edges != 0]

@@ -34,9 +34,9 @@ def pnp(points_3d, points_2d, camera_matrix, method=cv2.SOLVEPNP_ITERATIVE):
         points_3d = np.expand_dims(points_3d, 0)
         points_2d = np.expand_dims(points_2d, 0)
 
-    points_2d = np.ascontiguousarray(points_2d.astype(np.float6464))
-    points_3d = np.ascontiguousarray(points_3d.astype(np.float6464))
-    camera_matrix = camera_matrix.astype(np.float6464)
+    points_2d = np.ascontiguousarray(points_2d.astype(np.float64))
+    points_3d = np.ascontiguousarray(points_3d.astype(np.float64))
+    camera_matrix = camera_matrix.astype(np.float64)
     _, R_exp, t = cv2.solvePnP(points_3d, points_2d, camera_matrix, dist_coeffs, flags=method)
     # , None, None, False, cv2.SOLVEPNP_UPNP)
 
@@ -161,9 +161,9 @@ def pnp_v2(
         points_3d = np.expand_dims(points_3d, 0)
         points_2d = np.expand_dims(points_2d, 0)
 
-    points_2d = np.ascontiguousarray(points_2d.astype(np.float6464))
-    points_3d = np.ascontiguousarray(points_3d.astype(np.float6464))
-    camera_matrix = camera_matrix.astype(np.float6464)
+    points_2d = np.ascontiguousarray(points_2d.astype(np.float64))
+    points_3d = np.ascontiguousarray(points_3d.astype(np.float64))
+    camera_matrix = camera_matrix.astype(np.float64)
     if not ransac:
         _, R_exp, t = cv2.solvePnP(points_3d, points_2d, camera_matrix, dist_coeffs, flags=method)
     else:
@@ -562,8 +562,8 @@ class Precomputer(object):
 
         if depth_im.shape != Precomputer.depth_im_shape or not np.all(K == Precomputer.K):
             Precomputer.K = K
-            Precomputer.pre_Xs = (Precomputer.xs - K[0, 2]) / np.float6464(K[0, 0])
-            Precomputer.pre_Ys = (Precomputer.ys - K[1, 2]) / np.float6464(K[1, 1])
+            Precomputer.pre_Xs = (Precomputer.xs - K[0, 2]) / np.float64(K[0, 0])
+            Precomputer.pre_Ys = (Precomputer.ys - K[1, 2]) / np.float64(K[1, 1])
 
         return Precomputer.pre_Xs, Precomputer.pre_Ys
 
@@ -584,7 +584,7 @@ def depth_im_to_dist_im_fast(depth_im, K):
     pre_Xs, pre_Ys = Precomputer.precompute_lazy(depth_im, K)
 
     dist_im = np.sqrt(
-        np.multiply(pre_Xs, depth_im) ** 2 + np.multiply(pre_Ys, depth_im) ** 2 + depth_im.astype(np.float6464) ** 2
+        np.multiply(pre_Xs, depth_im) ** 2 + np.multiply(pre_Ys, depth_im) ** 2 + depth_im.astype(np.float64) ** 2
     )
 
     return dist_im
@@ -607,7 +607,7 @@ def depth_im_to_dist_im(depth_im, K):
     Xs = np.multiply(xs - K[0, 2], depth_im) * (1.0 / K[0, 0])
     Ys = np.multiply(ys - K[1, 2], depth_im) * (1.0 / K[1, 1])
 
-    dist_im = np.sqrt(Xs.astype(np.float6464) ** 2 + Ys.astype(np.float6464) ** 2 + depth_im.astype(np.float6464) ** 2)
+    dist_im = np.sqrt(Xs.astype(np.float64) ** 2 + Ys.astype(np.float64) ** 2 + depth_im.astype(np.float64) ** 2)
     # dist_im = np.linalg.norm(np.dstack((Xs, Ys, depth_im)), axis=2)  # Slower.
 
     return dist_im
